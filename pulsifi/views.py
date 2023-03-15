@@ -148,25 +148,19 @@ class FollowUserMixin(POSTRequestCheckerMixin):
     POST_request_checker_functions = (_check_follow_or_unfollow_in_POST_request,)
 
 
-class Home_View(RedirectURLMixin, TemplateView):  # TODO: toast for account deletion, show admin link for super-users, ask to log in when redirecting here (show modal), prevent users with >3 in progress reports or >0 completed reports from logging in (with reason page)
+class RedirectAuthenticatedUserMixin(Base_RedirectAuthenticatedUserMixin):
+    request: HttpRequest
+    redirect_field_name = DEFAULT_REDIRECT_FIELD_NAME
+
+    def get_success_url(self):
+        return allauth_utils.get_next_redirect_url(self.request, self.redirect_field_name) or allauth_utils.get_login_redirect_url(self.request)
+
+
+class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast for account deletion, show admin link for super-users, ask to log in when redirecting here (show modal), prevent users with >3 in progress reports or >0 completed reports from logging in (with reason page)
     template_name = "pulsifi/home.html"
     http_method_names = ["get"]
 
-    def dispatch(self, request, *args, **kwargs):
-        if self.request.user.is_authenticated:
-            redirect_to = self.get_success_url()
-
-            if redirect_to == self.request.path:
-                raise RedirectionLoopError(redirect_to, "Redirection loop for authenticated user detected. Check that your LOGIN_REDIRECT_URL doesn't point to a login page.")
-
-            return HttpResponseRedirect(redirect_to)
-
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_default_redirect_url(self):
-        return resolve_url(settings.LOGIN_REDIRECT_URL)
-
-    def get_context_data(self, **kwargs):
+    def get_context_data(self, **kwargs) -> dict[str, ...]:
         context = super().get_context_data(**kwargs)
 
         if "login_form" not in kwargs and "login_form" not in self.request.session:
@@ -204,9 +198,12 @@ class Home_View(RedirectURLMixin, TemplateView):  # TODO: toast for account dele
 
             del self.request.session["signup_form"]
 
-        if self.request.method == "GET" and "action" in self.request.GET:
-            if self.request.GET["action"] in ("login", "signup") and self.redirect_field_name in self.request.GET:
+        # noinspection PyArgumentList
+        if self.request.GET.get(key="action") in ("login", "signup"):
+            try:
                 context["redirect_field_value"] = self.request.GET[self.redirect_field_name]
+            except KeyError:
+                pass
 
         context["redirect_field_name"] = self.redirect_field_name
 

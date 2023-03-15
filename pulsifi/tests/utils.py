@@ -9,7 +9,6 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.fields import GenericRelation
 from django.db.models import Field, ManyToManyField, Model
 from django.test import TestCase
-
 from pulsifi.models import Pulse, Reply, User
 
 
@@ -172,7 +171,7 @@ class CreateTestUserHelper:
             )
 
     @classmethod
-    def get_test_unknown_field(cls, field_name: str) -> str:
+    def get_test_field_value(cls, field_name: str) -> str:
         """
             Helper function to return a new random value for the given field
             name.

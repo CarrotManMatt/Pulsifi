@@ -8,11 +8,10 @@ import re as regex
 from pathlib import Path
 
 import tldextract
+from core import utils as core_url_utils
 from django import urls as django_urls
 from django.core.exceptions import ImproperlyConfigured
 from environ import Env
-
-from core import utils as core_url_utils
 
 # Build paths inside the project like this: BASE_DIR / "subdir"
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -122,8 +121,8 @@ LOGIN_URL = core_url_utils.reverse_url_with_get_params_lazy(
     "pulsifi:home",
     get_params={"action": "login"}
 )
-LOGIN_REDIRECT_URL = django_urls.reverse_lazy("pulsifi:feed")
-LOGOUT_REDIRECT_URL = django_urls.reverse_lazy("default")
+LOGIN_REDIRECT_URL = django_urls.reverse_lazy("pulsifi:feed")  # TODO: dont need to reverse
+LOGOUT_REDIRECT_URL = django_urls.reverse_lazy("default")  # TODO: dont need to reverse
 SIGNUP_URL = core_url_utils.reverse_url_with_get_params_lazy(
     "pulsifi:home",
     get_params={"action": "signup"}

@@ -7,6 +7,8 @@ import logging
 from typing import Final, Iterable
 
 import tldextract
+from allauth import utils as allauth_core_utils
+from allauth.account import utils as allauth_utils
 from allauth.account.models import EmailAddress
 from django import urls as django_urls_utils
 from django.conf import settings
@@ -18,11 +20,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
-from thefuzz import fuzz as thefuzz
-from tldextract.tldextract import ExtractResult as TLD_ExtractResult
-
 from pulsifi.models import utils as pulsifi_models_utils
 from pulsifi.validators import ConfusableEmailValidator, ConfusableStringValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedNameValidator
+from thefuzz import fuzz as thefuzz
+from tldextract.tldextract import ExtractResult as TLD_ExtractResult
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 abstractmethod = abc.abstractmethod
@@ -452,16 +453,11 @@ class User(_Visible_Reportable_Model, AbstractUser):
 
             self.email = seperator.join((local, extracted_domain.fqdn))  # NOTE: Replace the cleaned email address
 
-        if EmailAddress.objects.filter(email=self.email).exclude(user_id=self.id).exists():
-            raise ValidationError({"email": f"The Email Address: {self.email} is already in use by another user."}, code="unique")
+        if allauth_core_utils.email_address_exists(self.email, self):
+            raise ValidationError({"email": f"That Email Address is already in use by another user."}, code="unique")
 
-        if self.verified:
-            NO_EMAIL_ERROR = ValidationError({"verified": "User cannot become verified without at least one verified email address."})
-            if get_user_model().objects.filter(id=self.id).exists():
-                if not self.emailaddress_set.filter(verified=True).exists():
-                    raise NO_EMAIL_ERROR
-            else:  # NOTE: User cannot be verified upon initial creation because no verified EmailAddress objects will exist yet
-                raise NO_EMAIL_ERROR
+        if self.verified and not allauth_utils.has_verified_email(self):
+            raise ValidationError({"verified": "User cannot become verified without at least one verified email address."})
 
         super().clean()
 
@@ -474,8 +470,6 @@ class User(_Visible_Reportable_Model, AbstractUser):
             primary email).
         """
 
-        self_already_exists: bool = get_user_model().objects.filter(id=self.id).exists()
-
         super().save(*args, **kwargs)
 
         self.ensure_superuser_in_admin_group()
@@ -487,16 +481,7 @@ class User(_Visible_Reportable_Model, AbstractUser):
         if self in self.followers.all():
             self.followers.remove(self)
 
-        if self_already_exists and not EmailAddress.objects.filter(email=self.email, user=self).exists():  # HACK: Checking for EmailAddress object existence (for primary email) cannot be done upon creation because EmailAddress objects are created after user save during signup flow
-            try:
-                old_primary_email = EmailAddress.objects.get(user=self, primary=True)  # NOTE: Make existing EmailAddress object marked as primary not primary
-            except EmailAddress.DoesNotExist:
-                pass
-            else:
-                old_primary_email.primary = False
-                old_primary_email.save()
-
-            EmailAddress.objects.create(email=self.email, user=self, primary=True)
+        # TODO: run sync_user_email_addresses as cron job instead
 
     def ensure_user_in_any_staff_group_is_staff(self) -> None:
         """
@@ -917,7 +902,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
 
                 elif self._content_type == ContentType.objects.get(app_label="pulsifi", model="user"):
                     if self._object_id == self.reporter_id:
-                        raise ValidationError({"_object_id": f"The reporter cannot create a report about themself."}, code="invalid")  # TODO: Better error message
+                        raise ValidationError({"_object_id": f"You cannot report yourself. Please choose a different user to report."}, code="invalid")
 
                     else:
                         REPORT_ADMIN_ERROR = ValidationError({"_object_id": "This object ID refers to an admin. Admins cannot be reported."}, code="invalid")
@@ -943,7 +928,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
 
         if self.assigned_moderator == self.reporter:  # NOTE: Attempt to pick a different moderator if the default is the reporter
             try:
-                # noinspection PyAttributeOutsideInit
+                # noinspection PyAttributeOutsideInit,PyTypeChecker
                 self.assigned_moderator_id = pulsifi_models_utils.get_random_moderator_id([self.reporter_id])
             except get_user_model().DoesNotExist as e:
                 raise ValidationError({"reporter": "This user cannot be the reporter because they are the only moderator available to be assigned to this report"}, code="invalid") from e

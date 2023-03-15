@@ -6,25 +6,6 @@ from django.db.models import Field
 from django.http import HttpRequest
 
 
-class RedirectionLoopError(ValueError):
-    """
-        Provided URL redirects to a location that refers to this URL. Results
-        in a redirection loop.
-    """
-
-    DEFAULT_MESSAGE = "Redirection loop detected."  # TODO: Better default message
-
-    def __init__(self, message: str = None, redirect_url: str = None) -> None:
-        self.message: str = message or self.DEFAULT_MESSAGE
-        self.redirect_url = redirect_url
-        super().__init__(message or self.DEFAULT_MESSAGE)
-
-    def __str__(self) -> str:
-        """ Returns formatted message & properties of the RedirectionLoopError. """
-
-        return f"{self.message} (redirect_url={repr(self.redirect_url)})"
-
-
 class UpdateFieldNamesError(ValueError):
     """
         Provided field names do not match any of the fields within the given

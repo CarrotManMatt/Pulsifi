@@ -2,6 +2,7 @@
     Automated test suite for concrete models in pulsifi app.
 """
 
+from allauth.account import utils as allauth_utils
 from allauth.account.models import EmailAddress
 from django.conf import settings
 from django.contrib import auth
@@ -9,13 +10,13 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import models
-
 from pulsifi.models import Report, User
 from pulsifi.tests.utils import Base_TestCase, CreateTestUserGeneratedContentHelper, CreateTestUserHelper, GetFieldsHelper
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
 
+# TODO: change assertRaises to assertRaisesMessage
 # TODO: tests docstrings
 
 class User_Model_Tests(Base_TestCase):
@@ -30,7 +31,7 @@ class User_Model_Tests(Base_TestCase):
                 setattr(
                     user,
                     field.name,
-                    CreateTestUserHelper.get_test_unknown_field(field.name)
+                    CreateTestUserHelper.get_test_field_value(field.name)
                 )
             elif isinstance(field, models.BooleanField):
                 setattr(user, field.name, not getattr(user, field.name))
@@ -237,14 +238,41 @@ class User_Model_Tests(Base_TestCase):
 
         self.assertEqual("@".join([local_email, "gmail.com"]), user.email)
 
-    def test_email_address_object_from_user_primary_email(self):
+    def test_verified_user_must_have_at_least_one_verified_email(self):
+        with self.assertRaisesMessage(ValidationError, "User cannot become verified without at least one verified email address."):
+            CreateTestUserHelper.create_test_user(verified=True)
+
+        user = CreateTestUserHelper.create_test_user()
+        allauth_utils.sync_user_email_addresses(user)
+        primary_email: EmailAddress = user.emailaddress_set.get()
+        primary_email.primary = True
+        primary_email.save()
+
+        with self.assertRaisesMessage(ValidationError, "User cannot become verified without at least one verified email address."):
+            user.update(verified=True)
+
+        primary_email.verified = True
+        primary_email.save()
+
+        try:
+            user.update(verified=True)
+        except ValidationError:
+            self.fail()
+
+    def test_verify_not_duplicate_email_attribute(self):
         user = CreateTestUserHelper.create_test_user()
 
-        self.assertFalse(EmailAddress.objects.filter(user=user, email=user.email).exists())
+        with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
+            CreateTestUserHelper.create_test_user(email=user.email)
 
-        user.save()
+    def test_verify_not_duplicate_email_object(self):
+        user = CreateTestUserHelper.create_test_user()
+        allauth_utils.sync_user_email_addresses(user)
+        old_email = user.email
+        user.update(email=CreateTestUserHelper.get_test_field_value("email"))
 
-        self.assertTrue(EmailAddress.objects.filter(user=user, email=user.email).exists())
+        with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
+            CreateTestUserHelper.create_test_user(email=old_email)
 
     def test_reverse_liked_content_becoming_disliked_removes_like(self):
         user1 = CreateTestUserHelper.create_test_user()
