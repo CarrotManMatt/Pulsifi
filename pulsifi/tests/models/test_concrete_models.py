@@ -9,8 +9,9 @@ from django.contrib import auth
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, ValidationError
-from django.db import models
-from pulsifi.models import Report, User
+from django.db import IntegrityError, models, transaction
+
+from pulsifi.models import Follow, Report, User
 from pulsifi.tests.utils import Base_TestCase, CreateTestUserGeneratedContentHelper, CreateTestUserHelper, GetFieldsHelper
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
@@ -184,16 +185,14 @@ class User_Model_Tests(Base_TestCase):
     def test_user_cannot_be_in_own_following(self):
         user = CreateTestUserHelper.create_test_user()
 
-        user.following.add(user)
-
-        self.assertNotIn(user, user.following.all())
+        with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
+            user.add_following(user)
 
     def test_user_cannot_be_in_own_followers(self):
         user = CreateTestUserHelper.create_test_user()
 
-        user.followers.add(user)
-
-        self.assertNotIn(user, user.followers.all())
+        with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
+            user.add_followers(user)
 
     def test_non_staff_cannot_have_restricted_admin_username(self):
         for restricted_admin_username in settings.RESTRICTED_ADMIN_USERNAMES:
@@ -333,6 +332,14 @@ class User_Model_Tests(Base_TestCase):
             user.update(last_name="test_value")
 
         self.assertIsNone(user.last_name)
+
+
+class Follow_Model_Tests(Base_TestCase):
+    def test_cannot_have_same_follower_as_followee(self):
+        user = CreateTestUserHelper.create_test_user()
+
+        with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
+            Follow.objects.create(followee=user, follower=user)
 
 
 class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validation errors from clean method

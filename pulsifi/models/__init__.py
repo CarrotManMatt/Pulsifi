@@ -20,18 +20,19 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
-from pulsifi.models import utils as pulsifi_models_utils
-from pulsifi.validators import ConfusableEmailValidator, ConfusableStringValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedNameValidator
 from thefuzz import fuzz as thefuzz
 from tldextract.tldextract import ExtractResult as TLD_ExtractResult
+
+from pulsifi.models import utils as pulsifi_models_utils
+from pulsifi.validators import ConfusableEmailValidator, ConfusableStringValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedNameValidator
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 abstractmethod = abc.abstractmethod
 
 
-class _Visible_Reportable_Model(pulsifi_models_utils.Custom_Base_Model):
+class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
     """
-        Base model that prevents objects from actually being deleted (making
+        Model mixin that prevents objects from actually being deleted (making
         them invisible instead), as well as allowing all objects of this type
         to have reports made about them.
 
@@ -103,7 +104,7 @@ class _Visible_Reportable_Model(pulsifi_models_utils.Custom_Base_Model):
         return "".join(f"{char}\u0336" for char in string)
 
 
-class User_Generated_Content_Model(_Visible_Reportable_Model, pulsifi_models_utils.Date_Time_Created_Base_Model):  # TODO: calculate time remaining based on engagement (decide {just likes}, {likes & {likes of replies}} or {likes, {likes of replies} & replies}) & creator follower count
+class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide {just likes}, {likes & {likes of replies}} or {likes, {likes of replies} & replies}) & creator follower count
     """
         Base model that defines fields for all types of user generated content,
         as well as extra instance methods for retrieving commonly computed
@@ -210,14 +211,14 @@ class User_Generated_Content_Model(_Visible_Reportable_Model, pulsifi_models_uti
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
 
 
-class User(_Visible_Reportable_Model, AbstractUser):
+class User(_Visible_Reportable_Mixin, AbstractUser):
     """
         Model to define changes to existing fields/extra fields & processing
         for users, beyond that/those given by Django's base :model:`auth.user`
         model.
     """
 
-    STAFF_GROUP_NAMES = ["Moderators", "Admins"]
+    STAFF_GROUP_NAMES = {"Moderators", "Admins"}
 
     first_name = None  # make blank in save method
     last_name = None
@@ -335,6 +336,8 @@ class User(_Visible_Reportable_Model, AbstractUser):
         "self",
         symmetrical=False,
         related_name="followers",
+        through="Follow",
+        through_fields=("followee", "follower"),
         blank=True,
         help_text="Set of other :model:`pulsifi.user` objects that this user is following."
     )
@@ -475,12 +478,6 @@ class User(_Visible_Reportable_Model, AbstractUser):
         self.ensure_superuser_in_admin_group()
         self.ensure_user_in_any_staff_group_is_staff()
 
-        if self in self.following.all():
-            self.following.remove(self)
-
-        if self in self.followers.all():
-            self.followers.remove(self)
-
         # TODO: run sync_user_email_addresses as cron job instead
 
     def ensure_user_in_any_staff_group_is_staff(self) -> None:
@@ -490,15 +487,8 @@ class User(_Visible_Reportable_Model, AbstractUser):
             is_staff property set to True.
         """
 
-        index = 0
-        while not self.is_staff and index < len(self.STAFF_GROUP_NAMES):
-            try:
-                if Group.objects.get(name=self.STAFF_GROUP_NAMES[index]) in self.groups.all():
-                    self.update(is_staff=True)
-            except Group.DoesNotExist:
-                logging.error(f"Could not check whether User: {self} is in \"{self.STAFF_GROUP_NAMES[index]}\" group because it does not exist.")
-            finally:
-                index += 1
+        if not self.is_staff and self.STAFF_GROUP_NAMES & set(self.groups.all().values_list("name", flat=True)):
+            self.update(is_staff=True)
 
     def ensure_superuser_in_admin_group(self) -> None:
         """
@@ -507,14 +497,11 @@ class User(_Visible_Reportable_Model, AbstractUser):
             :model:`auth.group`.
         """
 
-        if self.is_superuser:
+        if self.is_superuser and "Admins" not in self.groups.all().values_list("name", flat=True):
             try:
-                admin_group = Group.objects.get(name="Admins")
+                self.groups.add(Group.objects.get(name="Admins"))
             except Group.DoesNotExist:
                 logging.error(f"User: {self} is superuser but could not be added to \"Admins\" group because it does not exist.")
-            else:
-                if admin_group not in self.groups.all():
-                    self.groups.add(admin_group)
 
     def get_absolute_url(self) -> str:
         """ Returns the canonical URL for this object instance. """
@@ -531,6 +518,12 @@ class User(_Visible_Reportable_Model, AbstractUser):
             creator__in=self.following.exclude(is_active=False)
         ).order_by("_date_time_created")
 
+    def add_following(self, *objs, bulk=True) -> None:
+        self.following.add(*objs, bulk, through_defaults=dict())
+
+    def add_followers(self, *objs, bulk=True) -> None:
+        self.followers.add(*objs, bulk, through_defaults=dict())
+
     @classmethod
     def get_proxy_field_names(cls) -> set[str]:
         """
@@ -544,6 +537,37 @@ class User(_Visible_Reportable_Model, AbstractUser):
         extra_property_fields.add("visible")
 
         return extra_property_fields
+
+
+class Follow(models.Model):
+    followee = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='followers_set'
+    )
+    follower = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='following_set'
+    )
+
+    def clean(self):
+        if self.follower_id == self.followee_id:
+            raise ValidationError("Cannot follow self.")
+
+        super().clean()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['follower', 'followee'],
+                name='follow_once'
+            ),
+            models.CheckConstraint(
+                check=~models.Q(follower=models.F('followee')),
+                name='not_follow_self'
+            )
+        ]
 
 
 class Pulse(User_Generated_Content_Model):
@@ -716,7 +740,7 @@ class Reply(User_Generated_Content_Model):
         self.base_save(clean=False, *args, **kwargs)
 
 
-class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_Time_Created_Base_Model):
+class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_Time_Created_Mixin):
     """
         Model to define reports, which flags inappropriate content/users to
         moderators.

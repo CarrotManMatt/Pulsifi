@@ -112,12 +112,3 @@ def user_in_moderator_group_made_staff_and_superuser_in_admin_group(sender, inst
                     user: User
                     for user in check_admin_users:
                         user.ensure_superuser_in_admin_group()
-
-
-# noinspection PyUnusedLocal
-@signal_receiver(signals.m2m_changed, sender=get_user_model().following.through)
-def prevent_follow_self(sender, instance: User, action: str, reverse: bool, model, pk_set: set[int], **_kwargs) -> None:
-    """ Event handler for when a user is added to their own following list. """
-
-    if action == "pre_add" and instance.id in pk_set:
-        pk_set.remove(instance.id)

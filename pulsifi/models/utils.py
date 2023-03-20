@@ -179,9 +179,9 @@ class Custom_Base_Model(models.Model):
         return set()
 
 
-class Date_Time_Created_Base_Model(models.Model):
+class Date_Time_Created_Mixin(models.Model):
     """
-        Base model that provides the field date_time_created, which is used by
+        Model mixin that provides the field date_time_created, which is used by
         some other models in pulsifi app.
 
         This class is abstract so should not be instantiated or have a table

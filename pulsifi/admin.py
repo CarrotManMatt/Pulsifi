@@ -556,8 +556,7 @@ class User_Admin(BaseUserAdmin):
             "fields": (
                 ("username", "email"),
                 "bio",
-                ("verified", "is_active"),
-                "following"
+                ("verified", "is_active")
             )
         }),
         ("Authentication", {
@@ -583,7 +582,7 @@ class User_Admin(BaseUserAdmin):
             "fields": (("username", "email"), ("password1", "password2"))
         }),
         ("Extra", {
-            "fields": ("bio", ("verified", "is_active"), "following"),
+            "fields": ("bio", ("verified", "is_active")),
             "classes": ("collapse",)
         }),
         ("Permissions", {
@@ -597,6 +596,7 @@ class User_Admin(BaseUserAdmin):
         })
     )
     inlines = (
+        #  TODO: following inline
         EmailAddress_Inline,
         Avatar_Inline,
         Created_Pulse_Inline,
@@ -633,7 +633,6 @@ class User_Admin(BaseUserAdmin):
         ("last_login", DateTimeRangeFilter)
     )
     autocomplete_fields = (
-        "following",
         "groups",
         "liked_pulse_set",
         "disliked_pulse_set",
