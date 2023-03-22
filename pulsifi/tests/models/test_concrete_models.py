@@ -339,7 +339,7 @@ class Follow_Model_Tests(Base_TestCase):
         user = CreateTestUserHelper.create_test_user()
 
         with self.assertRaisesMessage(ValidationError, "not_follow_self"):
-            Follow.objects.create(followee=user, follower=user)
+            Follow.objects.create(follower=user, followed=user)
 
 
 class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validation errors from clean method
