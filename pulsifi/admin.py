@@ -4,19 +4,21 @@
 
 from typing import Sequence, Type
 
+from django import shortcuts as django_shortcuts
 from django.contrib import admin, auth
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.db import models
 from django.forms import BaseModelForm
+from django.http import HttpRequest
 from rangefilter.filters import DateTimeRangeFilter
 
 from .admin_filters import AssignedModeratorListFilter, CategoryListFilter, CreatedPulsesListFilter, CreatedRepliesListFilter, DirectRepliesListFilter, DislikesListFilter, GroupListFilter, HasReportAboutObjectListFilter, LikesListFilter, RepliedObjectTypeListFilter, ReportedObjectTypeListFilter, StaffListFilter, StatusListFilter, UserContentVisibleListFilter, UserVerifiedListFilter, UserVisibleListFilter
 from .admin_inlines import About_Object_Report_Inline, Avatar_Inline, Created_Pulse_Inline, Created_Reply_Inline, Direct_Reply_Inline, Disliked_Pulse_Inline, Disliked_Reply_Inline, EmailAddress_Inline, Liked_Pulse_Inline, Liked_Reply_Inline, Moderator_Assigned_Report_Inline, Submitted_Report_Inline, _Base_Report_Inline_Config
-from .models import Pulse, Reply, Report, User
+from .models import Follow, Pulse, Reply, Report, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
-# admin.site.login = login_required(admin.site.login)
+# admin.site.login = login_required(admin.site.login)  # TODO: make admin site use normal login
 admin.site.site_header = "Pulsifi Administration"
 admin.site.site_title = "Pulsifi Admin"
 admin.site.index_title = "Whole Site Overview"
@@ -29,7 +31,7 @@ class _Custom_Base_Admin(admin.ModelAdmin):
         customises how querysets are deleted.
     """
 
-    def delete_queryset(self, request, queryset: models.QuerySet[Pulse | Reply | Report]) -> None:
+    def delete_queryset(self, request: HttpRequest, queryset: models.QuerySet[Pulse | Reply | Report]) -> None:
         """
             Overrides original queryset deletion by calling delete() on each
             object individually (rather than the bulk delete command), so that
@@ -82,13 +84,13 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
     )
     actions = None
     search_fields = ("creator__username", "message", "liked_by__username", "disliked_by__username")
-    autocomplete_fields = ("liked_by", "disliked_by")
+    autocomplete_fields = ("creator", "liked_by", "disliked_by")
     search_help_text = "Search for a creator, message content or liked/disliked by user"
     list_editable = ("visible",)
     inlines = (Direct_Reply_Inline, About_Object_Report_Inline)
     list_display_links = ("message",)
 
-    def get_queryset(self, request) -> models.QuerySet[Pulse | Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Pulse | Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.user` model instances that
             can be edited by the admin site. This is used by changelist_view.
@@ -148,7 +150,7 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
 
         return len(obj.full_depth_replies)
 
-    def get_readonly_fields(self, request, obj: Pulse | Reply = None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Pulse | Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -168,7 +170,7 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
 
         return tuple(readonly_fields)
 
-    def get_list_filter(self, request) -> Sequence[Type[admin.ListFilter]]:
+    def get_list_filter(self, request: HttpRequest) -> Sequence[Type[admin.ListFilter]]:
         """
             Adds the necessary list_filters to the parent class's set of
             list_filters, only if they don't already exist.
@@ -186,7 +188,7 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
 
         return tuple(list_filter)
 
-    def get_inlines(self, request, obj: Pulse | Reply) -> Sequence[Type[admin.options.InlineModelAdmin]]:
+    def get_inlines(self, request: HttpRequest, obj: Pulse | Reply) -> Sequence[Type[admin.options.InlineModelAdmin]]:
         """
             Adds the necessary inlines to the parent class's set of inlines,
             only if they don't already exist.
@@ -201,6 +203,22 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
             return tuple([inline for inline in inlines if not issubclass(inline, _Base_Report_Inline_Config)])
         else:
             return tuple(inlines)
+
+    def get_form(self, *args, **kwargs) -> Type[BaseModelForm]:
+        """
+            Return a Form class for use in the admin add view. This is used by
+            add_view and change_view.
+
+            Changes the labels on the form to remove unnecessary clutter.
+        """
+
+        kwargs["help_texts"] = {
+            "liked_by": None,
+            "disliked_by": None,
+            "visible": None
+        }
+
+        return super().get_form(*args, **kwargs)
 
 
 @admin.register(Pulse)
@@ -233,7 +251,7 @@ class Pulse_Admin(_User_Content_Admin):
         })
     )
 
-    def get_list_display(self, request) -> Sequence[str]:
+    def get_list_display(self, request: HttpRequest) -> Sequence[str]:
         """
             Removes the necessary list_display fields from the parent class's
             set of list_display fields, if they already exist when they
@@ -249,7 +267,7 @@ class Pulse_Admin(_User_Content_Admin):
 
         return tuple(list_display)
 
-    def get_fieldsets(self, request, obj: Pulse = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
+    def get_fieldsets(self, request: HttpRequest, obj: Pulse = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
             Removes/adds the necessary fieldsets fields from the parent class's
             fieldsets configuration, if they already exist when they shouldn't,
@@ -336,7 +354,7 @@ class Reply_Admin(_User_Content_Admin):
 
         return obj.original_pulse
 
-    def get_fieldsets(self, request, obj: Reply = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
+    def get_fieldsets(self, request: HttpRequest, obj: Reply = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
             Removes/adds the necessary fieldsets fields from the parent class's
             fieldsets configuration, if they already exist when they shouldn't,
@@ -390,7 +408,7 @@ class Reply_Admin(_User_Content_Admin):
 
         return fieldsets
 
-    def get_list_display(self, request) -> Sequence[str]:
+    def get_list_display(self, request: HttpRequest) -> Sequence[str]:
         """
             Removes the necessary list_display fields from the parent class's
             set of list_display fields, if they don't exist when they should.
@@ -409,7 +427,7 @@ class Reply_Admin(_User_Content_Admin):
 
         return tuple(list_display)
 
-    def get_list_filter(self, request) -> Sequence[Type[admin.ListFilter]]:
+    def get_list_filter(self, request: HttpRequest) -> Sequence[Type[admin.ListFilter]]:
         """
             Adds the necessary list_filters to the parent class's set of
             list_filters, only if they don't already exist.
@@ -421,7 +439,7 @@ class Reply_Admin(_User_Content_Admin):
 
         return tuple(list_filter)
 
-    def get_readonly_fields(self, request, obj: Reply = None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -462,6 +480,7 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
         "assigned_moderator",
         "status"
     )
+    autocomplete_fields = ("reporter", "assigned_moderator")
     search_help_text = "Search for a reporter, reported object type, reason, category, assigned moderator or status"
 
     @admin.display(description="Report", ordering=("_content_type", "_object_id"))
@@ -474,7 +493,7 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
 
         return str(obj)[:18]
 
-    def get_fields(self, request, obj: Report = None) -> Sequence[str | tuple[str, ...]]:
+    def get_fields(self, request: HttpRequest, obj: Report = None) -> Sequence[str | tuple[str, ...]]:
         """
             Removes/adds the necessary fields from the parent class's fields
             configuration, if they already exist when they shouldn't, or if
@@ -512,7 +531,7 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
 
         return tuple(fields)
 
-    def get_list_filter(self, request) -> Sequence[Type[admin.ListFilter]]:
+    def get_list_filter(self, request: HttpRequest) -> Sequence[Type[admin.ListFilter]]:
         """
             Adds the necessary list_filters to the parent class's set of
             list_filters, only if they don't already exist.
@@ -529,7 +548,27 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
 
         return tuple(list_filter)
 
-    def has_add_permission(self, request) -> bool:
+    def get_form(self, *args, **kwargs) -> Type[BaseModelForm]:
+        """
+            Return a Form class for use in the admin add view. This is used by
+            add_view and change_view.
+
+            Changes the labels on the form to remove unnecessary clutter.
+        """
+
+        kwargs["help_texts"] = {
+            "reporter": None,
+            "_content_type": None,
+            "_object_id": None,
+            "reason": None,
+            "category": None,
+            "status": None,
+            "assigned_moderator": None
+        }
+
+        return super().get_form(*args, **kwargs)
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
         """ Prevents creation of this object if no moderators exist. """
 
         try:
@@ -556,7 +595,8 @@ class User_Admin(BaseUserAdmin):
             "fields": (
                 ("username", "email"),
                 "bio",
-                ("verified", "is_active")
+                ("verified", "is_active"),
+                ("display_followers", "display_following")
             )
         }),
         ("Authentication", {
@@ -596,7 +636,6 @@ class User_Admin(BaseUserAdmin):
         })
     )
     inlines = (
-        #  TODO: following inline
         EmailAddress_Inline,
         Avatar_Inline,
         Created_Pulse_Inline,
@@ -616,7 +655,9 @@ class User_Admin(BaseUserAdmin):
         "is_staff",
         "is_active",
         "display_pulses",
-        "display_replies"
+        "display_replies",
+        "display_followers",
+        "display_following"
     )
     list_display_links = ("display_username",)
     list_editable = ("email", "verified", "is_staff", "is_active")
@@ -645,12 +686,14 @@ class User_Admin(BaseUserAdmin):
         "display_date_joined",
         "display_last_login",
         "display_pulses",
-        "display_replies"
+        "display_replies",
+        "display_followers",
+        "display_following"
     )
     search_fields = ("username", "email", "bio")
     search_help_text = "Search for a username, email address or bio"
 
-    def get_queryset(self, request) -> models.QuerySet[User]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[User]:
         """
             Return a QuerySet of all :model:`pulsifi.user` model instances that
             can be edited by the admin site. This is used by changelist_view.
@@ -663,7 +706,9 @@ class User_Admin(BaseUserAdmin):
 
         queryset = queryset.annotate(
             _pulses=models.Count("created_pulse_set", distinct=True),
-            _replies=models.Count("created_reply_set", distinct=True)
+            _replies=models.Count("created_reply_set", distinct=True),
+            _followers=models.Count("followers", distinct=True),
+            _following=models.Count("following", distinct=True)
         )
 
         return queryset
@@ -687,6 +732,26 @@ class User_Admin(BaseUserAdmin):
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
         return obj._replies
+
+    @admin.display(description="Number of followers", ordering="_followers")
+    def display_followers(self, obj: User) -> int:
+        """
+            Returns the number of other users that are following this user, to
+            be displayed on the admin page.
+        """
+
+        # noinspection PyUnresolvedReferences, PyProtectedMember
+        return obj._followers
+
+    @admin.display(description="Number of following users", ordering="_following")
+    def display_following(self, obj: User) -> int:
+        """
+            Returns the number of other users this user is following, to be
+            displayed on the admin page.
+        """
+
+        # noinspection PyUnresolvedReferences, PyProtectedMember
+        return obj._following
 
     @admin.display(description="Username", ordering="username")
     def display_username(self, obj: User) -> str:
@@ -727,12 +792,20 @@ class User_Admin(BaseUserAdmin):
         kwargs.update(
             {
                 "labels": {"password": "Hashed password string"},
-                "help_texts": {"is_active": None}
+                "help_texts": {
+                    "bio": None,
+                    "verified": None,
+                    "groups": None,
+                    "user_permissions": None,
+                    "is_staff": None,
+                    "is_superuser": None,
+                    "is_active": None
+                }
             }
         )
         return super().get_form(*args, **kwargs)
 
-    def get_inlines(self, request, obj: User) -> Sequence[Type[admin.options.InlineModelAdmin]]:
+    def get_inlines(self, request: HttpRequest, obj: User) -> Sequence[Type[admin.options.InlineModelAdmin]]:
         """
             Adds the necessary inlines to the parent class's set of inlines,
             only if they don't already exist.
@@ -750,7 +823,7 @@ class User_Admin(BaseUserAdmin):
 
         return tuple(inlines)
 
-    def delete_queryset(self, request, queryset: models.QuerySet[User]) -> None:
+    def delete_queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> None:
         """
             Overrides original queryset deletion by calling delete() on each
             object individually (rather than the bulk delete command), so that
@@ -761,3 +834,33 @@ class User_Admin(BaseUserAdmin):
 
         for obj in queryset:
             obj.delete()
+
+
+@admin.register(Follow)
+class Follow_Admin(admin.ModelAdmin):
+    """
+        Admin display configuration for :model:`pulsifi.user` models, that
+        adds the functionality to provide custom display configurations on the
+        list, create & update pages.
+    """
+
+    list_display = ("follower", "followed")
+    list_editable = ("follower", "followed")
+    list_display_links = None
+    search_fields = (
+        "follower__username",
+        "followed__username",
+        "follower__bio",
+        "followed__bio"
+    )
+    search_help_text = "Search for a follower or followed's username or bio"
+    autocomplete_fields = ("follower", "followed")
+
+    def change_view(self, request: HttpRequest, object_id: int, form_url="", extra_context: dict[str, ...] = None):
+        """
+            The 'change' admin view for this model. Overriden to redirect back
+            to the changelist view.
+        """
+
+        # noinspection PyProtectedMember
+        return django_shortcuts.redirect(f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist")

@@ -337,7 +337,7 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         symmetrical=False,
         related_name="followers",
         through="Follow",
-        through_fields=("followee", "follower"),
+        through_fields=("follower", "followed"),
         blank=True,
         help_text="Set of other :model:`pulsifi.user` objects that this user is following."
     )
@@ -519,9 +519,19 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         ).order_by("_date_time_created")
 
     def add_following(self, *objs, bulk=True) -> None:
+        """
+            Adds the provided User objects to the set of other
+            :model:`pulsifi.user` objects that this user is following.
+        """
+
         self.following.add(*objs, bulk, through_defaults=dict())
 
     def add_followers(self, *objs, bulk=True) -> None:
+        """
+            Adds the provided User objects to the set of other
+            :model:`pulsifi.user` objects that are following this user.
+        """
+
         self.followers.add(*objs, bulk, through_defaults=dict())
 
     @classmethod
@@ -539,33 +549,44 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         return extra_property_fields
 
 
-class Follow(models.Model):
-    followee = models.ForeignKey(
-        get_user_model(),
-        on_delete=models.CASCADE,
-        related_name='followers_set'
-    )
+class Follow(pulsifi_models_utils.Custom_Base_Model):
+    """
+        Intermediate through model that represents the link between the
+        many-to-many relationship of one user following another.
+    """
+
     follower = models.ForeignKey(
         get_user_model(),
         on_delete=models.CASCADE,
-        related_name='following_set'
+        related_name="followers_set"
+    )
+    followed = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name="following_set"
     )
 
-    def clean(self):
-        if self.follower_id == self.followee_id:
-            raise ValidationError("Cannot follow self.")
+    def __repr__(self):
+        return f"<{self._meta.verbose_name}: {self.follower}, {self.followed}>"
 
-        super().clean()
+    def __str__(self) -> str:
+        """
+            Returns the stringified version of this :model:`pulsifi.follow`
+            object with the follower and followed.
+        """
+
+        return f"{self.id}: {self.follower} -> {self.followed}"
 
     class Meta:
+        verbose_name = "Following Link"
         constraints = [
             models.UniqueConstraint(
-                fields=['follower', 'followee'],
-                name='follow_once'
+                fields=["follower", "followed"],
+                name="follow_once"
             ),
             models.CheckConstraint(
-                check=~models.Q(follower=models.F('followee')),
-                name='not_follow_self'
+                check=~models.Q(follower=models.F("followed")),
+                name="not_follow_self"
             )
         ]
 

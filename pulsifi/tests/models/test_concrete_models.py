@@ -338,7 +338,7 @@ class Follow_Model_Tests(Base_TestCase):
     def test_cannot_have_same_follower_as_followee(self):
         user = CreateTestUserHelper.create_test_user()
 
-        with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
+        with self.assertRaisesMessage(ValidationError, "not_follow_self"):
             Follow.objects.create(followee=user, follower=user)
 
 

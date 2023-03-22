@@ -9,6 +9,7 @@ from avatar.models import Avatar
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
+from django.http import HttpRequest
 
 from pulsifi.models import Pulse, Reply, Report
 
@@ -97,7 +98,7 @@ class _Created_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Stack
     fk_name = "creator"
     autocomplete_fields = ("liked_by", "disliked_by")
 
-    def get_queryset(self, request) -> models.QuerySet[Pulse | Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Pulse | Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` or
             :model:`pulsifi.reply` model instances that can be created/edited
@@ -125,7 +126,7 @@ class _Related_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Tabul
         etc).
     """
 
-    def _get_queryset(self, request, model: str) -> models.QuerySet[Pulse | Reply]:
+    def _get_queryset(self, request: HttpRequest, model: str) -> models.QuerySet[Pulse | Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` or
             :model:`pulsifi.reply` model instances that can be created/edited
@@ -148,7 +149,7 @@ class _Related_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Tabul
 
         return queryset
 
-    def has_add_permission(self, request, obj: Pulse.liked_by.through | Pulse.disliked_by.through | Reply.liked_by.through | Reply.disliked_by.through) -> bool:  # HACK: Prevent from creating new content objects from within this type of inline, as validation/signals is/are not performed/sent correctly
+    def has_add_permission(self, request: HttpRequest, obj: Pulse.liked_by.through | Pulse.disliked_by.through | Reply.liked_by.through | Reply.disliked_by.through) -> bool:  # HACK: Prevent from creating new content objects from within this type of inline, as validation/signals is/are not performed/sent correctly
         """
             Prevent creation of new content objects from within this type of
             inline, because validation/signals is/are not performed/sent
@@ -174,7 +175,7 @@ class _Related_Pulse_Inline(_Related_User_Content_Inline):
 
         return obj.pulse.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_queryset(self, request) -> models.QuerySet[Pulse]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Pulse]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` model instances
             that can be created/edited within this admin inline.
@@ -186,7 +187,7 @@ class _Related_Pulse_Inline(_Related_User_Content_Inline):
 
         return super()._get_queryset(request, "pulse")
 
-    def get_fields(self, request, obj: Pulse.liked_by.through | Pulse.disliked_by.through = None) -> Sequence[str]:
+    def get_fields(self, request: HttpRequest, obj: Pulse.liked_by.through | Pulse.disliked_by.through = None) -> Sequence[str]:
         """
             Removes the necessary fields from the parent class's set of
             fields, only if they exist where they shouldn't.
@@ -234,7 +235,7 @@ class _Related_Reply_Inline(_Related_User_Content_Inline):
 
         return obj.reply.original_pulse
 
-    def get_queryset(self, request) -> models.QuerySet[Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.reply` model instances
             that can be created/edited within this admin inline.
@@ -341,7 +342,7 @@ class Created_Pulse_Inline(_Base_Pulse_Inline_Config, _Created_User_Content_Inli
 
         return obj.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_readonly_fields(self, request, obj=None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Pulse = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -410,7 +411,7 @@ class Created_Reply_Inline(_Base_Reply_Inline_Config, _Created_User_Content_Inli
 
         return obj.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_readonly_fields(self, request, obj=None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -512,7 +513,7 @@ class Direct_Reply_Inline(_Base_Reply_Inline_Config, _Base_User_Content_Inline_C
     ]
     autocomplete_fields = ["liked_by", "disliked_by"]
 
-    def get_queryset(self, request) -> models.QuerySet[Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.reply` model instances
             that can be created/edited within this admin inline.
@@ -531,7 +532,7 @@ class Direct_Reply_Inline(_Base_Reply_Inline_Config, _Base_User_Content_Inline_C
 
         return queryset
 
-    def get_readonly_fields(self, request, obj: Reply = None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.

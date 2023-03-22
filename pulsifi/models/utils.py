@@ -55,11 +55,16 @@ def get_random_moderator_id(excluded_moderator_ids: Iterable[int] = None) -> int
 
 
 def get_restricted_admin_users_count(exclusion_id: int) -> int:
-    query_restricted_admin_usernames = (models.Q(username__icontains=username) for username in settings.RESTRICTED_ADMIN_USERNAMES)
+    """
+        Returns the number of :model:`pulsifi.user` objects that already exist
+        with their username one of the restricted usernames (declared in
+        settings.py).
+    """
+
     return get_user_model().objects.exclude(id=exclusion_id).filter(
         functools.reduce(
             operator.or_,
-            query_restricted_admin_usernames
+            (models.Q(username__icontains=username) for username in settings.RESTRICTED_ADMIN_USERNAMES)
         )
     ).count()
 
