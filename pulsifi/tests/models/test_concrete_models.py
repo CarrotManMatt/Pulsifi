@@ -417,7 +417,7 @@ class Report_Model_Tests(Base_TestCase):
                 _content_type=ContentType.objects.get_for_model(user2),
                 _object_id=user2.id,
                 reason="test reason message",
-                category=Report.SPAM
+                category=Report.Categories.SPAM
             )
         self.assertEqual(1, len(e.exception.error_dict))
         self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
@@ -437,7 +437,7 @@ class Report_Model_Tests(Base_TestCase):
                     _content_type=ContentType.objects.get_for_model(content),
                     _object_id=content.id,
                     reason="test reason message",
-                    category=Report.SPAM
+                    category=Report.Categories.SPAM
                 )
             self.assertEqual(1, len(e.exception.error_dict))
             self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
@@ -453,7 +453,7 @@ class Report_Model_Tests(Base_TestCase):
                 _content_type=ContentType.objects.get_for_model(user2),
                 _object_id=user2.id,
                 reason="test reason message",
-                category=Report.SPAM
+                category=Report.Categories.SPAM
             )
         self.assertEqual(1, len(e.exception.error_dict))
         self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
@@ -471,7 +471,7 @@ class Report_Model_Tests(Base_TestCase):
                     _content_type=ContentType.objects.get_for_model(content),
                     _object_id=content.id,
                     reason="test reason message",
-                    category=Report.SPAM
+                    category=Report.Categories.SPAM
                 )
             self.assertEqual(1, len(e.exception.error_dict))
             self.assertEqual("reporter", e.exception.error_dict.popitem()[0])

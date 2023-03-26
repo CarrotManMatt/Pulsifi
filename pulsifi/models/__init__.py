@@ -4,7 +4,6 @@
 
 import abc
 import logging
-from typing import Final, Iterable
 
 import tldextract
 from allauth import utils as allauth_core_utils
@@ -193,7 +192,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
     class Meta:
         abstract = True
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self._meta.verbose_name}: {self.creator}, \"{self.message[:settings.MESSAGE_DISPLAY_LENGTH]}\">"
 
     def __str__(self) -> str:
@@ -424,12 +423,8 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
             if (pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=self.id) >= settings.PULSIFI_ADMIN_COUNT or not self.is_staff) and restricted_admin_username_in_username:  # NOTE: The username can only contain a restricted_admin_username if the user is a staff member & the maximum admin count has not been reached
                 raise ValidationError({"username": "That username is not allowed."}, code="invalid")
 
-        if get_user_model().objects.filter(id=self.id).exists():  # NOTE: Get all the usernames except for this user
-            username_check_list: Iterable[str] = get_user_model().objects.exclude(id=self.id).values_list("username", flat=True)
-        else:
-            username_check_list: Iterable[str] = get_user_model().objects.values_list("username", flat=True)
-
-        for username in username_check_list:  # NOTE: Check this username is not too similar to any other username
+        username: str
+        for username in get_user_model().objects.exclude(id=self.id).values_list("username", flat=True):  # NOTE: Check this username is not too similar to any other username (apart from this user's existing email)
             if thefuzz.token_sort_ratio(self.username, username) >= settings.USERNAME_SIMILARITY_PERCENTAGE:
                 raise ValidationError({"username": "That username is too similar to a username belonging to an existing user."}, code="unique")
 
@@ -566,7 +561,7 @@ class Follow(pulsifi_models_utils.Custom_Base_Model):
         related_name="following_set"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self._meta.verbose_name}: {self.follower}, {self.followed}>"
 
     def __str__(self) -> str:
@@ -739,7 +734,7 @@ class Reply(User_Generated_Content_Model):
                 raise e
 
         else:
-            logging.warning(f"Replied object of {repr(self)[:100]} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
+            logging.warning(f"Replied object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
 
         super().clean()
 
@@ -767,39 +762,26 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         moderators.
     """
 
-    SPAM: Final = "SPM"
-    SEXUAL: Final = "SEX"
-    HATE: Final = "HAT"
-    VIOLENCE: Final = "VIO"
-    ILLEGAL_GOODS: Final = "IGL"
-    BULLYING: Final = "BUL"
-    INTELLECTUAL_PROPERTY: Final = "INP"
-    SELF_INJURY: Final = "INJ"
-    SCAM: Final = "SCM"
-    FALSE_INFO: Final = "FLS"
-    IN_PROGRESS: Final = "PR"
-    REJECTED: Final = "RE"
-    COMPLETED: Final = "CM"
-    category_choices = [
-        (SPAM, "Spam"),
-        (SEXUAL, "Nudity or sexual activity"),
-        (HATE, "Hate speech or symbols"),
-        (VIOLENCE, "Violence or dangerous organisations"),
-        (ILLEGAL_GOODS, "Sale of illegal or regulated goods"),
-        (BULLYING, "Bullying or harassment"),
-        (INTELLECTUAL_PROPERTY, "Intellectual property violation or impersonation"),
-        (SELF_INJURY, "Suicide or self-injury"),
-        (SCAM, "Scam or fraud"),
-        (FALSE_INFO, "False or misleading information")
-    ]
-    """ List of category code & display values of each category. """
+    class Categories(models.TextChoices):
+        """ Enum of category code & display values of each category. """
 
-    status_choices = [
-        (IN_PROGRESS, "In Progress"),
-        (REJECTED, "Rejected"),
-        (COMPLETED, "Completed")
-    ]
-    """ List of status code & display values of each status. """
+        SPAM = "SPM", "Spam"
+        SEXUAL = "SEX", "Nudity or sexual activity"
+        HATE = "HAT", "Hate speech or symbols"
+        VIOLENCE = "VIO", "Violence or dangerous organisations"
+        ILLEGAL_GOODS = "ILG", "Sale of illegal or regulated goods"
+        BULLYING = "BUL", "Bullying or harassment"
+        INTELLECTUAL_PROPERTY = "INP", "Intellectual property violation or impersonation"
+        SELF_INJURY = "INJ", "Suicide or self-injury"
+        SCAM = "SCM", "Scam or fraud"
+        FALSE_INFO = "FLS", "False or misleading information"
+
+    class Statuses(models.TextChoices):
+        """ Enum of status code & display values of each status. """
+
+        IN_PROGRESS = "PR", "In Progress"
+        REJECTED = "RE", "Rejected"
+        COMPLETED = "CM", "Completed"
 
     _content_type = models.ForeignKey(
         ContentType,
@@ -870,7 +852,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
     category = models.CharField(
         "Category",
         max_length=3,
-        choices=category_choices,
+        choices=Categories.choices,
         help_text="The category code that gives an overview as to the reason for the report."
     )
     """
@@ -881,8 +863,8 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
     status = models.CharField(
         "Status",
         max_length=2,
-        choices=status_choices,
-        default=IN_PROGRESS,
+        choices=Statuses.choices,
+        default=Statuses.IN_PROGRESS,
         help_text="The status code that outlines the current position within the moderation cycle that this report is within."
     )
     """
@@ -897,25 +879,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
             models.Index(fields=["_content_type", "_object_id"]),
         ]
 
-    # noinspection PyFinal
-    def __init__(self, *args, **kwargs) -> None:  # HACK: Make instance constants final by using type hinting & reassigning the original values from the class constants
-        self.SPAM: Final = type(self).SPAM
-        self.SEXUAL: Final = type(self).SEXUAL
-        self.HATE: Final = type(self).HATE
-        self.VIOLENCE: Final = type(self).VIOLENCE
-        self.ILLEGAL_GOODS: Final = type(self).ILLEGAL_GOODS
-        self.BULLYING: Final = type(self).BULLYING
-        self.INTELLECTUAL_PROPERTY: Final = type(self).INTELLECTUAL_PROPERTY
-        self.SELF_INJURY: Final = type(self).SELF_INJURY
-        self.SCAM: Final = type(self).SCAM
-        self.FALSE_INFO: Final = type(self).FALSE_INFO
-        self.IN_PROGRESS: Final = type(self).IN_PROGRESS
-        self.REJECTED: Final = type(self).REJECTED
-        self.COMPLETED: Final = type(self).COMPLETED
-
-        super().__init__(*args, **kwargs)
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<{self._meta.verbose_name}: {self.reporter}, {self.category}, {self.get_status_display()} (Assigned Moderator - {self.assigned_moderator})>"
 
     def __str__(self) -> str:
@@ -969,7 +933,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
                 e.args = ("Reported object could not be correctly verified because content types for Pulses, Replies or Users do not exist.",)
                 raise e
         else:
-            logging.warning(f"Reported object of {repr(self)[:100]} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
+            logging.warning(f"Reported object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
 
         if self.assigned_moderator == self.reporter:  # NOTE: Attempt to pick a different moderator if the default is the reporter
             try:
