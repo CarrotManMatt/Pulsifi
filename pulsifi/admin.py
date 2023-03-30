@@ -324,6 +324,7 @@ class Reply_Admin(_User_Content_Admin):
         ("Replied Content", {
             "fields": (
                 ("_content_type", "_object_id"),
+                "display_replied_content",
                 "display_original_pulse"
             )
         }),
@@ -346,15 +347,25 @@ class Reply_Admin(_User_Content_Admin):
     )
 
     @admin.display(description="Original Pulse")
-    def display_original_pulse(self, obj: Reply) -> Pulse:
+    def display_original_pulse(self, obj: Reply) -> str:
         """
-            Returns the single :model:`pulsifi.pulse` object instance that is the
-            highest parent object in the tree of :model:`pulsifi.pulse` &
-            :model:`pulsifi.reply` objects that this :model:`pulsifi.reply`
-            object is within, to be displayed on the admin page.
+            Returns the details of the single :model:`pulsifi.pulse` object
+            instance that is the highest parent object in the tree of
+            :model:`pulsifi.pulse` & :model:`pulsifi.reply` objects that this
+            :model:`pulsifi.reply` object is within, to be displayed on the
+            admin pages.
         """
 
-        return obj.original_pulse
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"
+
+    @admin.display(description="Replied Content")
+    def display_replied_content(self, obj: Reply) -> str:
+        """
+            Returns the details of the replied_content object instance that
+            this :model:`pulsifi.reply` object is a Reply to.
+        """
+
+        return f"{obj.replied_content.id} | {obj.replied_content}"
 
     def get_fieldsets(self, request: HttpRequest, obj: Reply = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
@@ -449,7 +460,12 @@ class Reply_Admin(_User_Content_Admin):
 
         readonly_fields: set[str] = set(super().get_readonly_fields(request, obj))
 
-        readonly_fields.add("display_original_pulse")
+        readonly_fields.update(
+            (
+                "display_original_pulse",
+                "display_replied_content"
+            )
+        )
 
         return tuple(readonly_fields)
 
@@ -462,18 +478,33 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
         list, create & update pages.
     """
 
-    fields = (
-        "reporter",
-        ("_content_type", "_object_id"),
-        "reason",
-        "category",
-        ("assigned_moderator", "status"),
-        "display_date_time_created"
+    fieldsets = (
+        (None, {
+            "fields": (
+                "reporter",
+                "reason",
+                ("category", "display_date_time_created")
+            )
+        }),
+        ("Reported Object", {
+            "fields": (
+                ("_content_type", "_object_id"),
+                "display_reported_object"
+            )
+        }),
+        ("Moderation", {"fields": (("assigned_moderator", "status"),)})
     )
-    list_display = ("display_report", "reporter", "category", "status")
-    list_display_links = ("display_report",)
-    list_editable = ("reporter", "category", "status")
-    readonly_fields = ("display_report", "display_date_time_created")
+    list_display = (
+        "reporter",
+        "reason",
+        "reported_object",
+        "category",
+        "status",
+        "assigned_moderator"
+    )
+    list_display_links = ("reporter", "reason")
+    list_editable = ("category", "status", "assigned_moderator")
+    readonly_fields = ("display_reported_object", "display_date_time_created")
     search_fields = (
         "reporter",
         "_content_type",
@@ -486,52 +517,52 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
     search_help_text = "Search for a reporter, reported object type, reason, category, assigned moderator or status"
 
     @admin.display(description="Report", ordering=("_content_type", "_object_id"))
-    def display_report(self, obj: Report) -> str:
+    def display_reported_object(self, obj: Report) -> str:
         """
-            Returns the stringified version of the given
-            :model:`pulsifi.report` object instance, to be displayed on the
-            list admin page.
+            Returns the stringified version of the given reported object
+            instance, to be displayed on the admin pages.
         """
 
-        return str(obj)[:18]
+        return f"{obj.reported_object.id} | {obj.reported_object}"
 
-    def get_fields(self, request: HttpRequest, obj: Report = None) -> Sequence[str | tuple[str, ...]]:
+    def get_fieldsets(self, request: HttpRequest, obj: Report = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
-            Removes/adds the necessary fields from the parent class's fields
+            Removes/adds the necessary fields from the parent class's fieldsets
             configuration, if they already exist when they shouldn't, or if
             they don't exist when they should.
         """
 
-        fields: list[str | tuple[str, ...]] = list(super().get_fields(request, obj))
-        if obj is None:
-            if ("assigned_moderator", "status") in fields:
-                status_index = fields.index(("assigned_moderator", "status"))
-                fields.remove(("assigned_moderator", "status"))
-                if "status" not in fields:
-                    fields.insert(status_index, "status")
+        fieldsets: Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]] = super().get_fieldsets(request, obj)
 
-            try:
-                fields.remove("display_date_time_created")
-            except ValueError:
-                pass
+        if obj is None:
+            fields_0 = list(fieldsets[0][1]["fields"])
+            if ("category", "display_date_time_created") in fields_0:
+                category_index: int = fields_0.index(("category", "display_date_time_created"))
+                fields_0.remove(("category", "display_date_time_created"))
+                if "category" not in fields_0:
+                    fields_0.insert(category_index, "category")
+                fieldsets[0][1]["fields"] = tuple(dict.fromkeys(fields_0))
+
+            fields_2 = list(fieldsets[2][1]["fields"])
+            if ("assigned_moderator", "status") in fields_2:
+                status_index: int = fields_2.index(("assigned_moderator", "status"))
+                fields_2.remove(("assigned_moderator", "status"))
+                if "status" not in fields_2:
+                    fields_2.insert(status_index, "status")
+                fieldsets[2][1]["fields"] = tuple(dict.fromkeys(fields_2))
 
         else:
-            if "status" in fields:
-                status_index = fields.index("status")
-                fields.remove("status")
-                if ("assigned_moderator", "status") not in fields:
-                    fields.insert(status_index, ("assigned_moderator", "status"))
+            fields_0 = list(fieldsets[0][1]["fields"])
+            if ("assigned_moderator", "status") not in fields_0:
+                fields_0.append(("category", "display_date_time_created"))
+                fieldsets[0][1]["fields"] = tuple(dict.fromkeys(fields_0))
 
-            if "display_date_time_created" not in fields:
-                if ("assigned_moderator", "status") in fields:
-                    fields.insert(
-                        fields.index(("assigned_moderator", "status")),
-                        "display_date_time_created"
-                    )
-                else:
-                    fields.append("display_date_time_created")
+            fields_2 = list(fieldsets[2][1]["fields"])
+            if ("assigned_moderator", "status") not in fields_2:
+                fields_2.append(("assigned_moderator", "status"))
+                fieldsets[2][1]["fields"] = tuple(dict.fromkeys(fields_2))
 
-        return tuple(fields)
+        return tuple(fieldsets)
 
     def get_list_filter(self, request: HttpRequest) -> Sequence[Type[admin.ListFilter]]:
         """

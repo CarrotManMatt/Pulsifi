@@ -268,7 +268,7 @@ class _Base_Reply_Inline_Config(_Base_Inline_Config):
     model = Reply
 
     @admin.display(description="Original Pulse")
-    def display_original_pulse(self, obj: Reply) -> Pulse:
+    def display_original_pulse(self, obj: Reply) -> str:
         """
             Returns the single :model:`pulsifi.pulse` object instance that is
             the highest parent object in the tree of :model:`pulsifi.pulse` &
@@ -277,7 +277,7 @@ class _Base_Reply_Inline_Config(_Base_Inline_Config):
             admin page.
         """
 
-        return obj.original_pulse
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"
 
 
 class _Base_Report_Inline_Config(_Base_Inline_Config):

@@ -98,6 +98,8 @@ if not env("PULSIFI_ADMIN_COUNT") > 0:
     raise ImproperlyConfigured("PULSIFI_ADMIN_COUNT must be an integer greater than 0.")
 if not env("MESSAGE_DISPLAY_LENGTH") > 0:
     raise ImproperlyConfigured("MESSAGE_DISPLAY_LENGTH must be an integer greater than 0.")
+if not 1.0 <= env("MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST") <= 2880.0:
+    raise ImproperlyConfigured("MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST must be a float between 1.0 and 2880.0 (representing the number of minutes).")
 _FOLLOWER_COUNT_SCALING_FUNCTION_choices = ("logarithmic", "linear", "quadratic", "linearithmic", "exponential", "factorial")
 if env("FOLLOWER_COUNT_SCALING_FUNCTION") not in _FOLLOWER_COUNT_SCALING_FUNCTION_choices:
     raise ImproperlyConfigured(f"FOLLOWER_COUNT_SCALING_FUNCTION must be one of {_FOLLOWER_COUNT_SCALING_FUNCTION_choices}.")
@@ -207,6 +209,7 @@ EMAIL_USE_SSL = env("EMAIL_USE_SSL")
 # Custom settings values (used to control functionality of the app)
 PULSIFI_ADMIN_COUNT = env("PULSIFI_ADMIN_COUNT")
 MESSAGE_DISPLAY_LENGTH = env("MESSAGE_DISPLAY_LENGTH")
+MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST = datetime.timedelta(minutes=env("MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST"))
 USERNAME_SIMILARITY_PERCENTAGE = env("USERNAME_SIMILARITY_PERCENTAGE")
 RESTRICTED_ADMIN_USERNAMES = set(env("RESTRICTED_ADMIN_USERNAMES"))
 CUSTOM_RESERVED_USERNAMES = set(env("CUSTOM_RESERVED_USERNAMES"))
