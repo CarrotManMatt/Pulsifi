@@ -4,17 +4,14 @@
 
 import functools
 import operator
-import random
-from typing import Collection, Iterable
+from typing import Collection
 
-from django.apps import apps
 from django.conf import settings
 from django.contrib import auth
-from django.contrib.contenttypes.fields import GenericRelation
+from django.contrib.contenttypes.fields import GenericRel, GenericRelation
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
-
-from pulsifi.exceptions import UpdateFieldNamesError
+from django.db.models import ManyToManyField, ManyToManyRel, ManyToOneRel
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -80,25 +77,16 @@ class Custom_Base_Model(models.Model):
             fields = set()
 
         if deep:  # NOTE: Refresh any related fields/objects if requested
-            model_fields: set[models.Field] = {model_field for model_field in self._meta.get_fields() if model_field.name != "+"}
+            updated_model: models.Model = self._meta.model.objects.get(id=self.id)
 
-            if fields:  # NOTE: Limit the fields to update by the provided list of field names
-                update_fields: set[models.Field] = {update_field for update_field in model_fields if update_field.name in fields}
-            else:
-                update_fields = model_fields
+            field: models.Field
+            for field in self.get_single_relation_fields():
+                if not fields or field.name in fields:  # NOTE: Limit the fields to update by the provided list of field names
+                    setattr(self, field.name, getattr(updated_model, field.name))
 
-            if not update_fields:  # NOTE: Raise exception if none of the provided field names are valid fields for this model
-                raise UpdateFieldNamesError(model_fields=model_fields, update_field_names=fields)
-
-            else:
-                updated_model = self._meta.model.objects.get(id=self.id)
-
-                for field in update_fields:
-                    if field.is_relation and not isinstance(field, models.ManyToManyField) and not isinstance(field, models.ManyToManyRel) and not isinstance(field, GenericRelation) and not isinstance(field, models.ManyToOneRel):  # NOTE: It is only possible to refresh related objects from one of these hard-coded field types
-                        setattr(self, field.name, getattr(updated_model, field.name))
-
-                    elif field.is_relation:  # BUG: Relation fields not of acceptable type are not refreshed
-                        pass
+            for field in self.get_multi_relation_fields():  # BUG: Relation fields not of acceptable type are not refreshed
+                if not fields or field.name in fields:  # NOTE: Limit the fields to update by the provided list of field names
+                    pass
 
     def save(self, *args, **kwargs) -> None:
         """
@@ -153,6 +141,48 @@ class Custom_Base_Model(models.Model):
         """
 
         return set()
+
+    @classmethod
+    def get_non_relation_fields(cls, *, names=False) -> set[models.Field] | set[str]:
+        """
+            Helper function to return an iterable of all the standard
+            non-relation fields or field names of this model.
+        """
+
+        non_relation_fields: set[models.Field] = {field for field in cls._meta.get_fields() if field.name != "+" and not field.is_relation}
+
+        if names:
+            return {field.name for field in non_relation_fields}
+        else:
+            return non_relation_fields
+
+    @classmethod
+    def get_single_relation_fields(cls, *, names=False) -> set[models.Field] | set[str]:
+        """
+            Helper function to return an iterable of all the forward single
+            relation fields or field names of this model.
+        """
+
+        single_relation_fields: set[models.Field] = {field for field in cls._meta.get_fields() if field.name != "+" and field.is_relation and not isinstance(field, ManyToManyField) and not isinstance(field, ManyToManyRel) and not isinstance(field, ManyToOneRel) and not isinstance(field, GenericRelation) and not isinstance(field, GenericRel)}
+
+        if names:
+            return {field.name for field in single_relation_fields}
+        else:
+            return single_relation_fields
+
+    @classmethod
+    def get_multi_relation_fields(cls, *, names=False) -> set[models.Field] | set[str]:
+        """
+            Helper function to return an iterable of all the forward
+            many-to-many relation fields or field names of this model.
+        """
+
+        multi_relation_fields: set[models.Field] = {field for field in cls._meta.get_fields() if field.name != "+" and field.is_relation and (isinstance(field, ManyToManyField) or isinstance(field, ManyToManyRel) or isinstance(field, ManyToOneRel) or isinstance(field, GenericRelation) or isinstance(field, GenericRel))}
+
+        if names:
+            return {field.name for field in multi_relation_fields}
+        else:
+            return multi_relation_fields
 
 
 class Date_Time_Created_Mixin(models.Model):

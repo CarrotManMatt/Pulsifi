@@ -224,7 +224,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
 
 
-class User(_Visible_Reportable_Mixin, AbstractUser):
+class User(_Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick or staff badge next to username
     """
         Model to define changes to existing fields/extra fields & processing
         for users, beyond that/those given by Django's base :model:`auth.user`
