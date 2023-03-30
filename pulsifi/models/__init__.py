@@ -751,20 +751,15 @@ class Reply(User_Generated_Content_Model):
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
-        if self._content_type_id and self._object_id:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
-            try:
-                if self._content_type not in ContentType.objects.filter(app_label="pulsifi", model__in=("pulse", "reply")):
-                    raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: Pulse, Reply."}, code="invalid")
+        if self._content_type and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
+            if self._content_type.model not in {"pulse", "reply"}:
+                raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: Pulse, Reply."}, code="invalid")
 
-                if self._content_type == ContentType.objects.get(app_label="pulsifi", model="reply") and self._object_id == self.id:
-                    raise ValidationError({"_object_id": "Replied content cannot be this Reply."}, code="invalid")
+            if self._content_type.model == "reply" and self._object_id == self.id:
+                raise ValidationError({"_object_id": "Replied content cannot be this Reply."}, code="invalid")
 
-                if (self._content_type == ContentType.objects.get(app_label="pulsifi", model="pulse") and self._object_id not in Pulse.objects.all().values_list("id", flat=True)) or (self._content_type == ContentType.objects.get(app_label="pulsifi", model="reply") and self._object_id not in Reply.objects.all().values_list("id", flat=True)):
-                    raise ValidationError("Replied content must be valid object.")
-
-            except ContentType.DoesNotExist as e:
-                e.args = ("Replied object could not be correctly verified because content types for Pulses or Replies do not exist.",)
-                raise e
+            if (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):
+                raise ValidationError("Replied content must be valid object.")
 
         else:
             logging.warning(f"Replied object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
@@ -948,37 +943,25 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
-        if self._content_type_id and self._object_id:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
-            try:
-                if self._content_type not in ContentType.objects.filter(app_label="pulsifi", model__in=settings.REPORTABLE_CONTENT_TYPE_NAMES):
-                    raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: User, Pulse, Reply."}, code="invalid")
+        if self._content_type and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
+            if self._content_type.model not in self.REPORTABLE_CONTENT_TYPE_NAMES:
+                raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: User, Pulse, Reply."}, code="invalid")
 
-                elif (self._content_type == ContentType.objects.get(app_label="pulsifi", model="user") and self._object_id not in get_user_model().objects.all().values_list("id", flat=True)) or (self._content_type == ContentType.objects.get(app_label="pulsifi", model="pulse") and self._object_id not in Pulse.objects.all().values_list("id", flat=True)) or (self._content_type == ContentType.objects.get(app_label="pulsifi", model="reply") and self._object_id not in Reply.objects.all().values_list("id", flat=True)):
-                    raise ValidationError("Reported object must be valid object.")
+            if (self._content_type.model == "user" and not get_user_model().objects.filter(id=self._object_id).exists()) or (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):  # TODO: Check if this validation is needed or just inbuilt
+                raise ValidationError("Reported object must be valid object.")
 
-                elif self._content_type == ContentType.objects.get(app_label="pulsifi", model="pulse") or self._content_type == ContentType.objects.get(app_label="pulsifi", model="reply"):
-                    REPORT_ADMIN_CONTENT_ERROR = ValidationError({"_object_id": "This object ID refers to a Pulse or Reply created by an Admin. These Pulses & Replies cannot be reported."}, code="invalid")
+            if self._content_type.model in {"pulse", "reply"}:
+                if self.reported_object.creator.is_superuser or self.reported_object.creator.groups.filter(name="Admins").exists():
+                    raise ValidationError({"_object_id": "This reported object refers to a Pulse or Reply created by an Admin. These Pulses & Replies cannot be reported."}, code="invalid")
 
-                    if Group.objects.filter(name="Admins").exists():
-                        if self.reported_object.creator in get_user_model().objects.filter(models.Q(groups__name="Admins") | models.Q(is_superuser=True)):
-                            raise REPORT_ADMIN_CONTENT_ERROR
+                if self.reported_object.creator == self.reporter:
+                    raise ValidationError({"_object_id": "You cannot report your own content. Please choose a different object to report."}, code="invalid")
 
-                    elif self.reported_object.creator in get_user_model().objects.filter(is_superuser=True):
-                        raise REPORT_ADMIN_CONTENT_ERROR
+            if self._content_type.model == "user" and (self.reported_object.is_superuser or self.reported_object.groups.filter(name="Admins").exists()):
+                raise ValidationError({"_object_id": "This reported object refers to an admin. Admins cannot be reported."}, code="invalid")
 
-                elif self._content_type == ContentType.objects.get(app_label="pulsifi", model="user"):
-                    if self._object_id == self.reporter_id:
-                        raise ValidationError({"_object_id": f"You cannot report yourself. Please choose a different user to report."}, code="invalid")
-
-                    else:
-                        REPORT_ADMIN_ERROR = ValidationError({"_object_id": "This object ID refers to an admin. Admins cannot be reported."}, code="invalid")
-
-                        if Group.objects.filter(name="Admins").exists():
-                            if self._object_id in get_user_model().objects.filter(models.Q(groups__name="Admins") | models.Q(is_superuser=True)).values_list("id", flat=True):
-                                raise REPORT_ADMIN_ERROR
-
-                        elif self._object_id in get_user_model().objects.filter(is_superuser=True).values_list("id", flat=True):
-                            raise REPORT_ADMIN_ERROR
+            if self.reported_object == self.reporter:
+                raise ValidationError({"_object_id": f"You cannot report yourself. Please choose a different object to report."}, code="invalid")
 
         else:
             logging.warning(f"Reported object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
