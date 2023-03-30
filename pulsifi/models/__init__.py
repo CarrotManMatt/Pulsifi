@@ -4,6 +4,7 @@
 
 import abc
 import logging
+import random
 
 import tldextract
 from allauth import utils as allauth_core_utils
@@ -59,7 +60,7 @@ class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
 
     @property
     @abstractmethod
-    def visible(self) -> bool:
+    def is_visible(self) -> bool:
         """
             Boolean flag to determine whether this object should be accessible
             to the website. Use this flag instead of deleting objects.
@@ -67,25 +68,33 @@ class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
 
         raise NotImplementedError
 
-    @visible.setter
+    @is_visible.setter
     @abstractmethod
-    def visible(self, value: bool) -> None:
+    def is_visible(self, value: bool) -> None:
         raise NotImplementedError
 
     def delete(self, *_args, **_kwargs) -> tuple[int, dict[str, int]]:
         """
-            Sets this instances visible field to False instead of deleting this
+            Sets this instance's is_visible field to False instead of deleting this
             instance's data from the database.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.delete).
         """
 
-        self.visible = False
+        self.is_visible = False
         self.save()
 
         return 0, {}
 
     @abstractmethod
     def get_absolute_url(self):
-        """ Returns the canonical URL for this object instance. """
+        """
+            Returns the canonical URL for this object instance.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.get_absolute_url).
+        """
 
         raise NotImplementedError
 
@@ -98,7 +107,7 @@ class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
             character between every character in the string).
         """
 
-        if self.visible:
+        if self.is_visible:
             return string
         return "".join(f"{char}\u0336" for char in string)
 
@@ -115,7 +124,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
     """
 
     message = models.TextField("Message")
-    creator = models.ForeignKey(
+    creator: "User" = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         verbose_name="Creator",
@@ -157,7 +166,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         instance.
     """
 
-    visible = models.BooleanField(
+    is_visible = models.BooleanField(
         "Is visible?",
         default=True,
         help_text="Boolean flag to determine whether this object should be accessible to the website. Use this flag instead of deleting objects."
@@ -193,7 +202,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         abstract = True
 
     def __repr__(self) -> str:
-        return f"<{self._meta.verbose_name}: {self.creator}, \"{self.message[:settings.MESSAGE_DISPLAY_LENGTH]}\">"
+        return f"<{self._meta.verbose_name}: {self.creator}, \"{self.message}\">"
 
     def __str__(self) -> str:
         """
@@ -205,7 +214,12 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         return f"{self.creator}, {self.string_when_visible(self.message[:settings.MESSAGE_DISPLAY_LENGTH])}"
 
     def get_absolute_url(self) -> str:
-        """ Returns the canonical URL for this object instance. """
+        """
+            Returns the canonical URL for this object instance.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.get_absolute_url).
+        """
 
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
 
@@ -321,7 +335,7 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         user.
     """
 
-    verified = models.BooleanField(
+    is_verified = models.BooleanField(
         "Is verified?",
         default=False,
         help_text="Boolean flag to indicate whether this user is a noteable person/organisation."
@@ -385,7 +399,7 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
     )
 
     @property
-    def visible(self) -> bool:
+    def is_visible(self) -> bool:
         """
             Shortcut variable for the is_active property, to provide a
             consistent way to access the visibility of all objects in pulsifi
@@ -394,8 +408,8 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
 
         return self.is_active
 
-    @visible.setter
-    def visible(self, value: bool):
+    @is_visible.setter
+    def is_visible(self, value: bool):
         self.is_active = value
 
     class Meta:
@@ -413,6 +427,9 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         """
             Performs extra model-wide validation after clean() has been called
             on every field by self.clean_fields().
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
         if self.is_superuser:  # NOTE: is_staff should be True if is_superuser is True
@@ -454,8 +471,8 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         if allauth_core_utils.email_address_exists(self.email, self):
             raise ValidationError({"email": f"That Email Address is already in use by another user."}, code="unique")
 
-        if self.verified and not allauth_utils.has_verified_email(self):
-            raise ValidationError({"verified": "User cannot become verified without at least one verified email address."})
+        if self.is_verified and not allauth_utils.has_verified_email(self):
+            raise ValidationError({"is_verified": "User cannot become verified without at least one verified email address."})
 
         super().clean()
 
@@ -466,6 +483,9 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
             cleanup of relations (E.g. removing self from followers or ensuring
             an :model:`account.emailaddress` object exists for the user's
             primary email).
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.save).
         """
 
         super().save(*args, **kwargs)
@@ -474,6 +494,8 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
         self.ensure_user_in_any_staff_group_is_staff()
 
         # TODO: run sync_user_email_addresses as cron job instead
+        # TODO: run sync staff members with being verified (as long as have one verified email)
+        # TODO: run create Admins & Moderators groups as cron job
 
     def ensure_user_in_any_staff_group_is_staff(self) -> None:
         """
@@ -499,7 +521,12 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
                 logging.error(f"User: {self} is superuser but could not be added to \"Admins\" group because it does not exist.")
 
     def get_absolute_url(self) -> str:
-        """ Returns the canonical URL for this object instance. """
+        """
+            Returns the canonical URL for this object instance.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.get_absolute_url).
+        """
 
         return django_urls_utils.reverse("pulsifi:specific_account", kwargs={"username": self.username})
 
@@ -539,7 +566,7 @@ class User(_Visible_Reportable_Mixin, AbstractUser):
 
         extra_property_fields: set[str] = super().get_proxy_field_names()
 
-        extra_property_fields.add("visible")
+        extra_property_fields.add("is_visible")
 
         return extra_property_fields
 
@@ -601,22 +628,25 @@ class Pulse(User_Generated_Content_Model):
             Saves the current instance to the database, after making any
             :model:`pulsifi.reply` objects, of this instance, the matching
             visibility, to this pulse's visibility.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.save).
         """
 
         self.full_clean()
 
         try:
-            old_visible = Pulse.objects.get(id=self.id).visible
+            old_is_visible: bool = Pulse.objects.get(id=self.id).is_visible
         except Pulse.DoesNotExist:
             pass
         else:
-            if not self.visible and old_visible:
+            if not self.is_visible and old_is_visible:
                 for reply in self.full_depth_replies:
-                    reply.update(base_save=True, visible=False)
+                    reply.update(base_save=True, is_visible=False)
 
-            elif self.visible and not old_visible:
+            elif self.is_visible and not old_visibility:
                 for reply in self.full_depth_replies:
-                    reply.update(base_save=True, visible=True)
+                    reply.update(base_save=True, is_visible=True)
 
         super().save(*args, **kwargs)
 
@@ -654,7 +684,7 @@ class Reply(User_Generated_Content_Model):
     _content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
-        limit_choices_to={"app_label": "pulsifi", "model__in": ("pulse", "reply")},
+        limit_choices_to={"app_label": "pulsifi", "model__in": {"pulse", "reply"}},
         verbose_name="Replied Content Type",
         help_text="Link to the content type of the replied_content instance (either :model:`pulsifi.pulse` or :model:`pulsifi.reply`).",
         null=False,
@@ -716,6 +746,9 @@ class Reply(User_Generated_Content_Model):
         """
             Performs extra model-wide validation after clean() has been called
             on every field by self.clean_fields().
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
         if self._content_type_id and self._object_id:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
@@ -743,13 +776,16 @@ class Reply(User_Generated_Content_Model):
             Saves the current instance to the database, after ensuring the
             current instance is not visible if the original_pulse is not
             visible.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.save).
         """
 
         self.full_clean()
 
         if self.original_pulse:  # HACK: Don't try to retrieve the original_pulse for visibility updates (prevents error in AdminInlines where dummy objects are created without values in _content_type and _object_id)
-            if not self.original_pulse.visible:
-                self.visible = False
+            if not self.original_pulse.is_visible:
+                self.is_visible = False
         else:
             logging.warning(f"Visibility of original_pulse could not be correctly retrieved because _content_type and _object_id fields were not set, when updating reply visibility to match original_pulse's visibility. It is likely that this happened within an AdminInline.")
 
@@ -761,6 +797,8 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         Model to define reports, which flags inappropriate content/users to
         moderators.
     """
+
+    REPORTABLE_CONTENT_TYPE_NAMES = {"user", "pulse", "reply"}
 
     class Categories(models.TextChoices):
         """ Enum of category code & display values of each category. """
@@ -786,7 +824,10 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
     _content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
-        limit_choices_to={"app_label": "pulsifi", "model__in": settings.REPORTABLE_CONTENT_TYPE_NAMES},
+        limit_choices_to={
+            "app_label": "pulsifi",
+            "model__in": REPORTABLE_CONTENT_TYPE_NAMES
+        },
         verbose_name="Reported Object Type",
         help_text="Link to the content type of the reported_object instance (either :model:`pulsifi.user`, :model:`pulsifi.pulse` or :model:`pulsifi.reply`).",
         null=False,
@@ -810,7 +851,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         the _content_type and _object_id.
     """
 
-    reporter = models.ForeignKey(
+    reporter: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         verbose_name="Reporter",
@@ -824,16 +865,15 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         report.
     """
 
-    assigned_moderator = models.ForeignKey(
+    assigned_moderator: User = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         verbose_name="Assigned Moderator",
         related_name="moderator_assigned_report_set",
         limit_choices_to={"groups__name": "Moderators", "is_active": True},
-        default=pulsifi_models_utils.get_random_moderator_id,
         help_text="Link to the :model:`pulsifi.user` object instance (from the set of moderators) that has been assigned to moderate this report.",
         null=False,
-        blank=False
+        blank=True
     )
     """
         Link to the :model:`pulsifi.user` object instance (from the set of
@@ -889,6 +929,9 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         """
             Performs extra model-wide validation after clean() has been called
             on every field by self.clean_fields().
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
         if self._content_type_id and self._object_id:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
@@ -923,23 +966,37 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
                         elif self._object_id in get_user_model().objects.filter(is_superuser=True).values_list("id", flat=True):
                             raise REPORT_ADMIN_ERROR
 
-                    if self.assigned_moderator_id == self._object_id:  # NOTE: Attempt to pick a different moderator if the default is the reported user
-                        try:
-                            self.assigned_moderator_id = pulsifi_models_utils.get_random_moderator_id([self._object_id])
-                        except get_user_model().DoesNotExist as e:
-                            raise ValidationError({"_object_id": "This object ID refers to the only moderator available to be assigned to this report. Therefore, this moderator cannot be reported."}, code="invalid") from e
-
-            except ContentType.DoesNotExist as e:
-                e.args = ("Reported object could not be correctly verified because content types for Pulses, Replies or Users do not exist.",)
-                raise e
         else:
             logging.warning(f"Reported object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
 
-        if self.assigned_moderator == self.reporter:  # NOTE: Attempt to pick a different moderator if the default is the reporter
-            try:
-                # noinspection PyAttributeOutsideInit,PyTypeChecker
-                self.assigned_moderator_id = pulsifi_models_utils.get_random_moderator_id([self.reporter_id])
-            except get_user_model().DoesNotExist as e:
-                raise ValidationError({"reporter": "This user cannot be the reporter because they are the only moderator available to be assigned to this report"}, code="invalid") from e
+        moderator_qs: models.QuerySet[User] = self.get_moderator_qs()
+
+        if moderator_qs.count() == 1 and moderator_qs.first() == self.reported_object:
+            raise ValidationError({"_object_id": "This reported object refers to the only moderator available to be assigned to this report. Therefore, this moderator cannot be reported."}, code="invalid")
+
+        elif moderator_qs.count() == 1 and moderator_qs.first() == self.reporter:
+            raise ValidationError({"reporter": "This user cannot be the reporter because they are the only moderator available to be assigned to this report."}, code="invalid")
+
+        elif moderator_qs.count() == 1 and self._content_type.model in {"pulse", "reply"} and moderator_qs.first() == self.reported_object.creator:
+            raise ValidationError({"_object_id": "This content cannot be reported because it was created by the only moderator available to be assigned to this report."}, code="invalid")
+
+        elif self.assigned_moderator_id is None:
+            self.assigned_moderator_id = random.choice(moderator_qs.values_list("id", flat=True))
 
         super().clean()
+
+    @classmethod
+    def get_moderator_qs(cls) -> models.QuerySet[User]:
+        """
+            Returns the set of moderator :model:`pulsifi.user` objects that can
+            be picked to be the assigned_assigned moderator to any given
+            Report.
+        """
+
+        # noinspection PyProtectedMember
+        moderator_qs: models.QuerySet[User] = get_user_model().objects.filter(**cls._meta.get_field("assigned_moderator")._limit_choices_to)
+
+        if not moderator_qs.exists():
+            raise get_user_model().DoesNotExist("Random moderator cannot be chosen, because none exist.")
+
+        return moderator_qs

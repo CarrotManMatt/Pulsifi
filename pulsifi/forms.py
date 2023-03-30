@@ -6,8 +6,10 @@ import logging
 
 from allauth.account.forms import LoginForm as Base_LoginForm, SignupForm as Base_SignupForm
 from django import forms
+from django.conf import settings
 from django.contrib import auth
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from pulsifi.models import Pulse, Reply
 
@@ -70,7 +72,10 @@ class Signup_Form(_Base_Form_Config, Base_SignupForm):
         self.fields["password2"].widget.attrs["placeholder"] = "Re-enter your Password, to check that you can spell"
 
     def clean(self) -> dict[str]:
-        """ Validate inserted form data using temporary in-memory user object. """
+        """
+            Validate inserted form data using temporary in-memory
+            :model:`pulsifi.user` object.
+        """
 
         super().clean()
 
@@ -93,14 +98,14 @@ class Signup_Form(_Base_Form_Config, Base_SignupForm):
                 email=self.cleaned_data.get("email")
             ).full_clean()
         except ValidationError as e:
-            self.add_errors_from_ValidationError_exception(e, empty_fields)
+            self.add_errors_from_validation_error_exception(e, empty_fields)
 
         return self.cleaned_data
 
-    def add_errors_from_ValidationError_exception(self, exception: ValidationError, empty_fields: dict[str, bool] = None, model_field_name: str = None) -> None:
+    def add_errors_from_validation_error_exception(self, exception: ValidationError, empty_fields: dict[str, bool] = None, model_field_name: str = None) -> None:
         """
-            Adds the error message(s) from any caught ValidationError exceptions
-            to the forms errors dictionary/list.
+            Adds the error message(s) from any caught ValidationError
+            exceptions to the forms errors dictionary/list.
         """
 
         if not hasattr(exception, "error_dict") and hasattr(exception, "error_list"):

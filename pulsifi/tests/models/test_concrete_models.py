@@ -248,13 +248,13 @@ class User_Model_Tests(Base_TestCase):
         primary_email.save()
 
         with self.assertRaisesMessage(ValidationError, "User cannot become verified without at least one verified email address."):
-            user.update(verified=True)
+            user.update(is_verified=True)
 
         primary_email.verified = True
         primary_email.save()
 
         try:
-            user.update(verified=True)
+            user.update(is_verified=True)
         except ValidationError:
             self.fail()
 
@@ -391,7 +391,7 @@ class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validati
                     str(content)
                 )
 
-            content.update(visible=False)
+            content.update(is_visible=False)
 
             if model == "pulse":
                 self.assertEqual(

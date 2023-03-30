@@ -19,42 +19,7 @@ from pulsifi.exceptions import UpdateFieldNamesError
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
 
-def get_random_moderator_id(excluded_moderator_ids: Iterable[int] = None) -> int | None:
-    """
-        Returns a random moderator's ID. (Returns None if no moderators and no
-        reportable objects exist).
-    """
-
-    ret = True
-    for model_name in settings.REPORTABLE_CONTENT_TYPE_NAMES:
-        if model_name == "user":
-            if apps.get_model(app_label="pulsifi", model_name=model_name).objects.exclude(groups__name="Admins").exists():
-                ret = False
-        elif apps.get_model(app_label="pulsifi", model_name=model_name).objects.all().exists():
-            ret = False
-    if ret:
-        return  # HACK: Return None rather than raising an exception if no reportable objects exist. This prevents crashing during initialisation, as this function is parsed before reportable objects have been loaded (which would normally cause a crash)
-
-    if excluded_moderator_ids:
-        # noinspection PyProtectedMember
-        moderator_QS: models.QuerySet = get_user_model().objects.filter(**apps.get_model(app_label="pulsifi", model_name="report")._meta.get_field("assigned_moderator")._limit_choices_to).exclude(id__in=excluded_moderator_ids)
-    else:
-        # noinspection PyProtectedMember
-        moderator_QS: models.QuerySet = get_user_model().objects.filter(**apps.get_model(app_label="pulsifi", model_name="report")._meta.get_field("assigned_moderator")._limit_choices_to)
-
-    NO_MODERATORS_EXIST_ERROR = "Random moderator cannot be chosen, because none exist."
-    try:
-        return get_user_model().objects.get(
-            id=random.choice(moderator_QS.values_list("id", flat=True))
-        ).id
-    except get_user_model().DoesNotExist as e:
-        e.args = (NO_MODERATORS_EXIST_ERROR,)
-        raise e
-    except IndexError as e:
-        raise get_user_model().DoesNotExist(NO_MODERATORS_EXIST_ERROR) from e
-
-
-def get_restricted_admin_users_count(exclusion_id: int) -> int:
+def get_restricted_admin_users_count(*, exclusion_id: int) -> int:
     """
         Returns the number of :model:`pulsifi.user` objects that already exist
         with their username one of the restricted usernames (declared in
@@ -101,6 +66,9 @@ class Custom_Base_Model(models.Model):
             fields to update can be limited with the "fields" argument, and
             whether to update related objects or not can be specified with the
             "deep" argument.
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.refresh_from_db).
         """
 
         if fields is not None and not isinstance(fields, set):  # NOTE: Remove duplicate field names from fields parameter
@@ -138,13 +106,16 @@ class Custom_Base_Model(models.Model):
             has been cleaned. This ensures any data in the database is valid,
             even if the data was not added via a ModelForm (E.g. data is added
             using the ORM API).
+
+            Uses django's argument structure so cannot be changed (see
+            https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.save).
         """
 
         self.full_clean()
 
         super().save(*args, **kwargs)
 
-    def update(self, commit=True, base_save=False, clean=True, using: str = None, **kwargs) -> None:
+    def update(self, using: str = None, *, commit=True, base_save=False, clean=True, **kwargs) -> None:
         """
             Changes an in-memory object's values & save that object to the
             database all in one operation (based on Django's
@@ -173,8 +144,8 @@ class Custom_Base_Model(models.Model):
                 else:
                     self.save()
 
-    @staticmethod
-    def get_proxy_field_names() -> set[str]:
+    @classmethod
+    def get_proxy_field_names(cls) -> set[str]:
         """
             Returns a set of names of extra properties of this model that can
             be saved to the database, even though those fields don't actually

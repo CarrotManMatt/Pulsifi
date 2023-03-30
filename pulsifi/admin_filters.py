@@ -232,7 +232,7 @@ class CategoryListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return [category_choice for category_choice in Report.category_choices]
+        return Report.Categories.choices
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[Report]) -> models.QuerySet[Report]:
         """ Returns the filtered queryset according to the given url lookup. """
@@ -258,7 +258,7 @@ class StatusListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return [status_choice for status_choice in Report.status_choices]
+        return Report.Statuses.choices
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[Report]) -> models.QuerySet[Report]:
         """ Returns the filtered queryset according to the given url lookup. """

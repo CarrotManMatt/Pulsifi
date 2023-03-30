@@ -45,7 +45,7 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
     )
 
     @admin.display(description="Number of likes", ordering="_likes")
-    def display_likes(self, obj: Pulse | Reply) -> int:
+    def display_likes(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of likes that this User_Generated_Content has,
             to be displayed within a User_Generated_Content inline on the admin
@@ -53,10 +53,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._likes
+        return str(obj._likes)
 
     @admin.display(description="Number of dislikes", ordering="_dislikes")
-    def display_dislikes(self, obj: Pulse | Reply) -> int:
+    def display_dislikes(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of dislikes that this User_Generated_Content
             has, to be displayed within a User_Generated_Content inline on the
@@ -64,10 +64,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._dislikes
+        return str(obj._dislikes)
 
     @admin.display(description="Number of direct replies")
-    def display_direct_replies_count(self, obj: Pulse | Reply) -> int:
+    def display_direct_replies_count(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of direct :model:`pulsifi.reply` objects that
             this User_Generated_Content has, to be displayed within a
@@ -75,10 +75,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._direct_replies
+        return str(obj._direct_replies)
 
     @admin.display(description="Number of full depth replies")
-    def display_full_depth_replies_count(self, obj: Pulse | Reply) -> int:
+    def display_full_depth_replies_count(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of total :model:`pulsifi.reply` objects that are
             within the tree of this instance's children/children's children
@@ -86,7 +86,7 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
             admin page.
         """
 
-        return len(obj.full_depth_replies)
+        return str(len(obj.full_depth_replies))
 
 
 class _Created_User_Content_Inline(_Base_User_Content_Inline_Config, admin.StackedInline):
@@ -224,7 +224,7 @@ class _Related_Reply_Inline(_Related_User_Content_Inline):
         return obj.reply.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
     @admin.display(description="Original Pulse")
-    def display_original_pulse(self, obj: Reply.liked_by.through | Reply.disliked_by.through) -> Pulse:
+    def display_original_pulse(self, obj: Reply.liked_by.through | Reply.disliked_by.through) -> str:
         """
             Returns the single :model:`pulsifi.pulse` object instance that is
             the highest parent object in the tree of :model:`pulsifi.pulse` &
@@ -233,7 +233,7 @@ class _Related_Reply_Inline(_Related_User_Content_Inline):
             the admin page.
         """
 
-        return obj.reply.original_pulse
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"
 
     def get_queryset(self, request: HttpRequest) -> models.QuerySet[Reply]:
         """

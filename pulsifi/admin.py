@@ -80,13 +80,13 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
         "display_dislikes",
         "display_direct_replies_count",
         "display_full_depth_replies_count",
-        "visible"
+        "is_visible"
     )
     actions = None
     search_fields = ("creator__username", "message", "liked_by__username", "disliked_by__username")
     autocomplete_fields = ("creator", "liked_by", "disliked_by")
     search_help_text = "Search for a creator, message content or liked/disliked by user"
-    list_editable = ("visible",)
+    list_editable = ("is_visible",)
     inlines = (Direct_Reply_Inline, About_Object_Report_Inline)
     list_display_links = ("message",)
 
@@ -215,7 +215,9 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
         kwargs["help_texts"] = {
             "liked_by": None,
             "disliked_by": None,
-            "visible": None
+            "is_visible": None,
+            "_content_type": None,
+            "_object_id": None
         }
 
         return super().get_form(*args, **kwargs)
@@ -247,7 +249,7 @@ class Pulse_Admin(_User_Content_Admin):
             )
         }),
         (None, {
-            "fields": ("visible", "display_date_time_created")
+            "fields": ("is_visible", "display_date_time_created")
         })
     )
 
@@ -283,16 +285,16 @@ class Pulse_Admin(_User_Content_Admin):
             except ValueError:
                 pass
             else:
-                fieldsets[2][1]["fields"] = tuple(fields_2)
+                fieldsets[2][1]["fields"] = tuple(dict.fromkeys(fields_2))
 
             fields_1 = list(fieldsets[1][1]["fields"])
             if ("liked_by", "display_likes") in fields_1 and ("disliked_by", "display_dislikes") in fields_1:
-                liked_index = fields_1.index(("liked_by", "display_likes"))
+                liked_index: int = fields_1.index(("liked_by", "display_likes"))
                 fields_1.remove(("liked_by", "display_likes"))
                 fields_1.remove(("disliked_by", "display_dislikes"))
                 if ("liked_by", "disliked_by") not in fields_1:
                     fields_1.insert(liked_index, ("liked_by", "disliked_by"))
-                fieldsets[1][1]["fields"] = tuple(fields_1)
+                fieldsets[1][1]["fields"] = tuple(dict.fromkeys(fields_1))
 
             temp_fieldsets = list(fieldsets)
             try:
@@ -302,7 +304,7 @@ class Pulse_Admin(_User_Content_Admin):
             except ValueError:
                 pass
             else:
-                fieldsets = tuple(temp_fieldsets)
+                fieldsets = tuple(dict.fromkeys(temp_fieldsets))
 
         return fieldsets
 
@@ -339,7 +341,7 @@ class Reply_Admin(_User_Content_Admin):
             ))
         }),
         (None, {
-            "fields": ("visible", "display_date_time_created")
+            "fields": ("is_visible", "display_date_time_created")
         })
     )
 
@@ -370,7 +372,7 @@ class Reply_Admin(_User_Content_Admin):
             except ValueError:
                 pass
             else:
-                fieldsets[1][1]["fields"] = tuple(fields_1)
+                fieldsets[1][1]["fields"] = tuple(dict.fromkeys(fields_1))
 
             fields_3 = list(fieldsets[3][1]["fields"])
             try:
@@ -378,16 +380,16 @@ class Reply_Admin(_User_Content_Admin):
             except ValueError:
                 pass
             else:
-                fieldsets[3][1]["fields"] = fields_3
+                fieldsets[3][1]["fields"] = tuple(dict.fromkeys(fields_3))
 
             fields_2 = list(fieldsets[2][1]["fields"])
             if ("liked_by", "display_likes") in fields_2 and ("disliked_by", "display_dislikes") in fields_2:
-                liked_index = fields_2.index(("liked_by", "display_likes"))
+                liked_index: int = fields_2.index(("liked_by", "display_likes"))
                 fields_2.remove(("liked_by", "display_likes"))
                 fields_2.remove(("disliked_by", "display_dislikes"))
                 if ("liked_by", "disliked_by") not in fields_2:
                     fields_2.insert(liked_index, ("liked_by", "disliked_by"))
-                fieldsets[2][1]["fields"] = tuple(fields_2)
+                fieldsets[2][1]["fields"] = tuple(dict.fromkeys(fields_2))
 
             temp_fieldsets = list(fieldsets)
             try:
@@ -397,14 +399,14 @@ class Reply_Admin(_User_Content_Admin):
             except ValueError:
                 pass
             else:
-                fieldsets = tuple(temp_fieldsets)
+                fieldsets = tuple(dict.fromkeys(temp_fieldsets))
 
         else:
             fields_2 = list(fieldsets[2][1]["fields"])
             if ("liked_by", "display_likes") not in fields_2 and ("disliked_by", "display_dislikes") not in fields_2:
                 fields_2.append(("liked_by", "display_likes"))
                 fields_2.append(("disliked_by", "display_dislikes"))
-                fieldsets[2][1]["fields"] = tuple(fields_2)
+                fieldsets[2][1]["fields"] = tuple(dict.fromkeys(fields_2))
 
         return fieldsets
 
@@ -566,13 +568,19 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
             "assigned_moderator": None
         }
 
-        return super().get_form(*args, **kwargs)
+        form = super().get_form(*args, **kwargs)
+
+        if "assigned_moderator" in form.base_fields:
+            form.base_fields["assigned_moderator"].required = True
+            form.base_fields["assigned_moderator"].widget.widget.is_required = True
+
+        return form
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         """ Prevents creation of this object if no moderators exist. """
 
         try:
-            Report._meta.get_field("assigned_moderator").default()
+            Report.get_moderator_qs()
         except get_user_model().DoesNotExist:
             return False
         else:
@@ -595,7 +603,7 @@ class User_Admin(BaseUserAdmin):
             "fields": (
                 ("username", "email"),
                 "bio",
-                ("verified", "is_active"),
+                ("is_verified", "is_active"),
                 ("display_followers", "display_following")
             )
         }),
@@ -622,7 +630,7 @@ class User_Admin(BaseUserAdmin):
             "fields": (("username", "email"), ("password1", "password2"))
         }),
         ("Extra", {
-            "fields": ("bio", ("verified", "is_active")),
+            "fields": ("bio", ("is_verified", "is_active")),
             "classes": ("collapse",)
         }),
         ("Permissions", {
@@ -651,7 +659,7 @@ class User_Admin(BaseUserAdmin):
     list_display = (
         "display_username",
         "email",
-        "verified",
+        "is_verified",
         "is_staff",
         "is_active",
         "display_pulses",
@@ -660,7 +668,7 @@ class User_Admin(BaseUserAdmin):
         "display_following"
     )
     list_display_links = ("display_username",)
-    list_editable = ("email", "verified", "is_staff", "is_active")
+    list_editable = ("email", "is_verified", "is_staff", "is_active")
     list_filter = (
         UserVerifiedListFilter,
         StaffListFilter,
@@ -794,7 +802,7 @@ class User_Admin(BaseUserAdmin):
                 "labels": {"password": "Hashed password string"},
                 "help_texts": {
                     "bio": None,
-                    "verified": None,
+                    "is_verified": None,
                     "groups": None,
                     "user_permissions": None,
                     "is_staff": None,
@@ -837,7 +845,7 @@ class User_Admin(BaseUserAdmin):
 
 
 @admin.register(Follow)
-class Follow_Admin(admin.ModelAdmin):
+class Follow_Admin(admin.ModelAdmin):  # TODO: filter by followed/follower's group & other user attributes
     """
         Admin display configuration for :model:`pulsifi.user` models, that
         adds the functionality to provide custom display configurations on the
