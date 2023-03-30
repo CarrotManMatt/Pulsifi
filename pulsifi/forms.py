@@ -177,6 +177,19 @@ class Reply_Form(_Base_Form_Config, forms.ModelForm):
         self.fields["message"].label = "Reply message..."
         self.fields["message"].widget.attrs["placeholder"] = "Reply message..."
 
+    def clean(self) -> dict[str]:
+        """
+            Validate inserted form data using temporary in-memory
+            :model:`pulsifi.reply` object.
+        """
+
+        super().clean()
+
+        if (timezone.now() - Reply(creator=self.cleaned_data["creator"], _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse().date_time_created) < settings.MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST:  # TODO: identify if time since last reply is too soon
+            raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.")
+
+        return self.cleaned_data
+
 
 class Bio_Form(_Base_Form_Config, forms.ModelForm):
     """ Form for updating a user's bio. """

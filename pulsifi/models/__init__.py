@@ -154,7 +154,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         content object instance.
     """
 
-    reply_set = GenericRelation(  # TODO: ratelimit whether user can create a new reply based on time between now and time of creation of last reply for same original_pulse
+    reply_set = GenericRelation(
         "Reply",
         content_type_field="_content_type",
         object_id_field="_object_id",
@@ -790,6 +790,20 @@ class Reply(User_Generated_Content_Model):
             logging.warning(f"Visibility of original_pulse could not be correctly retrieved because _content_type and _object_id fields were not set, when updating reply visibility to match original_pulse's visibility. It is likely that this happened within an AdminInline.")
 
         self.base_save(clean=False, *args, **kwargs)
+
+    def get_latest_reply_of_same_original_pulse(self) -> "Reply":
+        """
+            Returns the most recently created :model:`pulsifi.reply` object by
+            this :model:`pulsifi.reply` object's creator, to the same
+            original_pulse as this :model:`pulsifi.reply` object's
+            original_pulse.
+        """
+
+        for reply in Reply.objects.exclude(id=self.id).filter(creator=self.creator).order_by("-_date_time_created"):
+            if reply.original_pulse == self.original_pulse:
+                return reply
+        else:
+            raise Reply.DoesNotExist("No other Replies from this creator exist, to this Reply's original Pulse")
 
 
 class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_Time_Created_Mixin):
