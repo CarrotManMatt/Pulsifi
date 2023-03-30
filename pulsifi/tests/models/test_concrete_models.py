@@ -498,7 +498,7 @@ class Report_Model_Tests(Base_TestCase):
             reported_object=reported_user
         )
 
-        with self.assertRaisesMessage(ValidationError, "Same"):
+        with self.assertRaisesMessage(ValidationError, "Report with this Reporter, Reported Object ID and Reported Object Type already exists."):
             Test_Report_Factory.create(
                 reporter=reporter,
                 reported_object=reported_user

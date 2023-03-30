@@ -603,7 +603,7 @@ class Follow(pulsifi_models_utils.Custom_Base_Model):
         verbose_name = "Following Link"
         constraints = [
             models.UniqueConstraint(
-                fields=["follower", "followed"],
+                fields=("follower", "followed"),
                 name="follow_once"
             ),
             models.CheckConstraint(
@@ -644,7 +644,7 @@ class Pulse(User_Generated_Content_Model):
                 for reply in self.full_depth_replies:
                     reply.update(base_save=True, is_visible=False)
 
-            elif self.is_visible and not old_visibility:
+            elif self.is_visible and not old_is_visible:
                 for reply in self.full_depth_replies:
                     reply.update(base_save=True, is_visible=True)
 
@@ -736,7 +736,7 @@ class Reply(User_Generated_Content_Model):
         verbose_name = "Reply"
         verbose_name_plural = "Replies"
         indexes = [
-            models.Index(fields=["_content_type", "_object_id"]),
+            models.Index(fields=("_content_type", "_object_id")),
         ]
 
     def __str__(self) -> str:
@@ -924,8 +924,9 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
     # noinspection PyMissingOrEmptyDocstring
     class Meta:
         verbose_name = "Report"
+        unique_together = ("reporter", "_object_id", "_content_type")
         indexes = [
-            models.Index(fields=["_content_type", "_object_id"]),
+            models.Index(fields=("_content_type", "_object_id")),
         ]
 
     def __repr__(self) -> str:
