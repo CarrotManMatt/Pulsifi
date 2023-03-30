@@ -1,0 +1,32 @@
+{
+  "user": {
+    "username": [
+      "padgriffin",
+      "grayson"
+    ],
+    "password": [
+      "aequei3Eequ",
+      "PulsifiPass123"
+    ],
+    "email": [
+      "robyn1973@yahoo.com",
+      "alexander.griffiths@shaw.com"
+    ],
+    "bio": [
+      "TV maven. Evil thinker. Infuriatingly humble gamer. Communicator. Pop culture advocate.",
+      "When life gives you lemons, throw them back"
+    ]
+  },
+  "user_generated_content": {
+    "message": [
+      "I think I'll always be famous. I just hope I don't become infamous.",
+      "The truth is lived, not taught."
+    ]
+  },
+  "report": {
+    "reason": [
+      "The user's account contains explicit and detailed instructions on how to acquire and use illegal firearms.",
+      "The user's account is promoting and organizing a cyber attack on a particular corporation or government entity, which is illegal and harmful."
+    ]
+  }
+}

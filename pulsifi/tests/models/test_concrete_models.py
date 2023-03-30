@@ -9,10 +9,11 @@ from django.contrib import auth
 from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import FieldDoesNotExist, ValidationError
-from django.db import IntegrityError, models, transaction
+from django.db import IntegrityError, transaction
 
-from pulsifi.models import Follow, Report, User
-from pulsifi.tests.utils import Base_TestCase, CreateTestUserGeneratedContentHelper, CreateTestUserHelper, GetFieldsHelper
+from pulsifi.models import Follow, Pulse, Reply, Report, User, User_Generated_Content_Model
+from pulsifi.tests import utils as pulsifi_tests_utils
+from pulsifi.tests.utils import Base_TestCase, Test_Report_Factory, Test_User_Factory
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -20,35 +21,9 @@ get_user_model = auth.get_user_model  # NOTE: Adding external package functions 
 # TODO: change assertRaises to assertRaisesMessage
 # TODO: tests docstrings
 
-class User_Model_Tests(Base_TestCase):
-    def test_refresh_from_database_updates_non_relation_fields(self):  # TODO: test validators & validation errors from clean method
-        user = CreateTestUserHelper.create_test_user()
-        old_user: User = get_user_model().objects.get(id=user.id)
-
-        self.assertEqual(user, old_user)
-
-        for field in GetFieldsHelper.get_non_relation_fields(user, exclude=["id", "last_login", "date_joined"]):
-            if field.name in CreateTestUserHelper.TEST_USERS[0]:
-                setattr(
-                    user,
-                    field.name,
-                    CreateTestUserHelper.get_test_field_value(field.name)
-                )
-            elif isinstance(field, models.BooleanField):
-                setattr(user, field.name, not getattr(user, field.name))
-
-            self.assertNotEqual(
-                getattr(user, field.name),
-                getattr(old_user, field.name)
-            )
-            user.refresh_from_db()
-            self.assertEqual(
-                getattr(old_user, field.name),
-                getattr(user, field.name)
-            )
-
+class User_Model_Tests(Base_TestCase):  # TODO: test validators & validation errors from clean method, test if username length check is working for in-code user creation
     def test_delete_makes_not_active(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         self.assertTrue(user.is_active)
 
@@ -58,29 +33,29 @@ class User_Model_Tests(Base_TestCase):
         self.assertFalse(user.is_active)
 
     def test_visible_shortcut_in_memory(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
-        self.assertTrue(user.visible)
+        self.assertTrue(user.is_visible)
         self.assertTrue(user.is_active)
 
-        user.visible = False
+        user.is_visible = False
 
-        self.assertFalse(user.visible)
+        self.assertFalse(user.is_visible)
         self.assertFalse(user.is_active)
 
     def test_visible_shortcut_in_database(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
-        self.assertTrue(user.visible)
+        self.assertTrue(user.is_visible)
         self.assertTrue(user.is_active)
 
-        user.update(visible=False)
+        user.update(is_visible=False)
 
-        self.assertFalse(user.visible)
+        self.assertFalse(user.is_visible)
         self.assertFalse(user.is_active)
 
     def test_stringify_displays_in_correct_format(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         self.assertEqual(f"@{user.username}", str(user))
 
@@ -92,7 +67,7 @@ class User_Model_Tests(Base_TestCase):
         )
 
     def test_user_becomes_superuser_put_in_admin_group(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
         admin_group = Group.objects.get(name="Admins")
 
         self.assertNotIn(admin_group, user.groups.all())
@@ -102,7 +77,7 @@ class User_Model_Tests(Base_TestCase):
         self.assertIn(admin_group, user.groups.all())
 
     def test_superuser_has_groups_changed_kept_in_admin_group(self):
-        user = CreateTestUserHelper.create_test_user(is_superuser=True)
+        user = Test_User_Factory.create(is_superuser=True)
         admin_group = Group.objects.get(name="Admins")
 
         self.assertIn(admin_group, user.groups.all())
@@ -124,7 +99,7 @@ class User_Model_Tests(Base_TestCase):
         self.assertIn(admin_group, user.groups.all())
 
     def test_admin_group_has_users_changed_superusers_kept_in_admin_group(self):
-        user = CreateTestUserHelper.create_test_user(is_superuser=True)
+        user = Test_User_Factory.create(is_superuser=True)
         admin_group = Group.objects.get(name="Admins")
 
         self.assertIn(user, admin_group.user_set.all())
@@ -146,7 +121,7 @@ class User_Model_Tests(Base_TestCase):
         self.assertIn(user, admin_group.user_set.all())
 
     def test_super_user_made_staff(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         self.assertFalse(user.is_staff)
 
@@ -157,7 +132,7 @@ class User_Model_Tests(Base_TestCase):
     def test_user_added_to_staff_group_made_staff(self):
         staff_group_name: str
         for staff_group_name in get_user_model().STAFF_GROUP_NAMES:
-            user = CreateTestUserHelper.create_test_user()
+            user = Test_User_Factory.create()
             group = Group.objects.get(name=staff_group_name)
 
             self.assertFalse(user.is_staff)
@@ -171,7 +146,7 @@ class User_Model_Tests(Base_TestCase):
     def test_moderator_group_has_user_added_made_staff(self):
         staff_group_name: str
         for staff_group_name in get_user_model().STAFF_GROUP_NAMES:
-            user = CreateTestUserHelper.create_test_user()
+            user = Test_User_Factory.create()
             group = Group.objects.get(name=staff_group_name)
 
             self.assertFalse(user.is_staff)
@@ -183,13 +158,13 @@ class User_Model_Tests(Base_TestCase):
             self.assertTrue(user.is_staff)
 
     def test_user_cannot_be_in_own_following(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
             user.add_following(user)
 
     def test_user_cannot_be_in_own_followers(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
             user.add_followers(user)
@@ -197,19 +172,19 @@ class User_Model_Tests(Base_TestCase):
     def test_non_staff_cannot_have_restricted_admin_username(self):
         for restricted_admin_username in settings.RESTRICTED_ADMIN_USERNAMES:
             with self.assertRaises(ValidationError) as e:
-                CreateTestUserHelper.create_test_user(username=restricted_admin_username)
+                Test_User_Factory.create(username=restricted_admin_username)
             self.assertEqual(1, len(e.exception.error_dict))
             self.assertEqual("username", e.exception.error_dict.popitem()[0])
 
     def test_staff_cannot_have_restricted_admin_username_when_already_max_admin_count(self):
         for restricted_admin_username in settings.RESTRICTED_ADMIN_USERNAMES:
-            CreateTestUserHelper.create_test_user(
+            Test_User_Factory.create(
                 username=f"{restricted_admin_username}test",
                 is_staff=True
             )
 
             with self.assertRaises(ValidationError) as e:
-                CreateTestUserHelper.create_test_user(
+                Test_User_Factory.create(
                     username=restricted_admin_username,
                     is_staff=True
                 )
@@ -219,29 +194,29 @@ class User_Model_Tests(Base_TestCase):
     def test_dots_removed_from_local_part_of_email(self):
         local_email = "test.local.email"
         domain_email = "test.domain.email.com"
-        user = CreateTestUserHelper.create_test_user(email="@".join([local_email, domain_email]))
+        user = Test_User_Factory.create(email="@".join([local_email, domain_email]))
 
         self.assertEqual("@".join([local_email.replace(".", ""), domain_email]), user.email)
 
     def test_plus_alias_removed_from_local_part_of_email(self):
         local_email = "test+local+email"
         domain_email = "test.domain.email.com"
-        user = CreateTestUserHelper.create_test_user(email="@".join([local_email, domain_email]))
+        user = Test_User_Factory.create(email="@".join([local_email, domain_email]))
 
         self.assertEqual("@".join([local_email.split("+", maxsplit=1)[0], domain_email]), user.email)
 
     def test_google_email_alias_replaced(self):
         local_email = "test"
         domain_email = "googlemail.com"
-        user = CreateTestUserHelper.create_test_user(email="@".join([local_email, domain_email]))
+        user = Test_User_Factory.create(email="@".join([local_email, domain_email]))
 
         self.assertEqual("@".join([local_email, "gmail.com"]), user.email)
 
     def test_verified_user_must_have_at_least_one_verified_email(self):
         with self.assertRaisesMessage(ValidationError, "User cannot become verified without at least one verified email address."):
-            CreateTestUserHelper.create_test_user(verified=True)
+            Test_User_Factory.create(is_verified=True)
 
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
         allauth_utils.sync_user_email_addresses(user)
         primary_email: EmailAddress = user.emailaddress_set.get()
         primary_email.primary = True
@@ -259,66 +234,70 @@ class User_Model_Tests(Base_TestCase):
             self.fail()
 
     def test_verify_not_duplicate_email_attribute(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
-            CreateTestUserHelper.create_test_user(email=user.email)
+            Test_User_Factory.create(email=user.email)
 
     def test_verify_not_duplicate_email_object(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
         allauth_utils.sync_user_email_addresses(user)
         old_email = user.email
-        user.update(email=CreateTestUserHelper.get_test_field_value("email"))
+        user.update(email=Test_User_Factory.create_field_value("email"))
 
         with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
-            CreateTestUserHelper.create_test_user(email=old_email)
+            Test_User_Factory.create(email=old_email)
 
     def test_reverse_liked_content_becoming_disliked_removes_like(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user1)
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
 
-            if model == "pulse":
-                user2.liked_pulse_set.add(content)
-            elif model == "reply":
-                user2.liked_reply_set.add(content)
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
 
-            self.assertTrue(content.liked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.disliked_by.filter(id=user2.id).exists())
+            if model_name == "pulse":
+                content_liker.liked_pulse_set.add(content)
+            elif model_name == "reply":
+                content_liker.liked_reply_set.add(content)
 
-            if model == "pulse":
-                user2.disliked_pulse_set.add(content)
-            elif model == "reply":
-                user2.disliked_reply_set.add(content)
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
 
-            self.assertTrue(content.disliked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.liked_by.filter(id=user2.id).exists())
+            if model_name == "pulse":
+                content_liker.disliked_pulse_set.add(content)
+            elif model_name == "reply":
+                content_liker.disliked_reply_set.add(content)
+
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
 
     def test_reverse_disliked_content_becoming_liked_removes_dislike(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user1)
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
 
-            if model == "pulse":
-                user2.disliked_pulse_set.add(content)
-            elif model == "reply":
-                user2.disliked_reply_set.add(content)
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
 
-            self.assertTrue(content.disliked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.liked_by.filter(id=user2.id).exists())
+            if model_name == "pulse":
+                content_liker.disliked_pulse_set.add(content)
+            elif model_name == "reply":
+                content_liker.disliked_reply_set.add(content)
 
-            if model == "pulse":
-                user2.liked_pulse_set.add(content)
-            elif model == "reply":
-                user2.liked_reply_set.add(content)
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
 
-            self.assertTrue(content.liked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.disliked_by.filter(id=user2.id).exists())
+            if model_name == "pulse":
+                content_liker.liked_pulse_set.add(content)
+            elif model_name == "reply":
+                content_liker.liked_reply_set.add(content)
+
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
 
     def test_obsolete_fields_from_base_user_class_are_none(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         self.assertIsNone(user.first_name)
         self.assertIsNone(user.last_name)
@@ -336,7 +315,7 @@ class User_Model_Tests(Base_TestCase):
 
 class Follow_Model_Tests(Base_TestCase):
     def test_cannot_have_same_follower_as_followee(self):
-        user = CreateTestUserHelper.create_test_user()
+        user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(ValidationError, "not_follow_self"):
             Follow.objects.create(follower=user, followed=user)
@@ -344,48 +323,52 @@ class Follow_Model_Tests(Base_TestCase):
 
 class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validation errors from clean method
     def test_liked_content_becoming_disliked_removes_like(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
 
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user1)
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
 
-            content.liked_by.add(user2)
+            content.liked_by.add(content_liker)
 
-            self.assertTrue(content.liked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.disliked_by.filter(id=user2.id).exists())
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
 
-            content.disliked_by.add(user2)
+            content.disliked_by.add(content_liker)
 
-            self.assertTrue(content.disliked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.liked_by.filter(id=user2.id).exists())
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
 
     def test_disliked_content_becoming_liked_removes_dislike(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user1)
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
 
-            content.disliked_by.add(user2)
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
 
-            self.assertTrue(content.disliked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.liked_by.filter(id=user2.id).exists())
+            content.disliked_by.add(content_liker)
 
-            content.liked_by.add(user2)
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
 
-            self.assertTrue(content.liked_by.filter(id=user2.id).exists())
-            self.assertFalse(content.disliked_by.filter(id=user2.id).exists())
+            content.liked_by.add(content_liker)
+
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
 
     def test_stringify_displays_in_correct_format(self):
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model)
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: Pulse | Reply = pulsifi_tests_utils.get_model_factory(model_name).create()
 
-            if model == "pulse":
+            if model_name == "pulse":
                 self.assertEqual(
                     f"{content.creator}, {content.message[:settings.MESSAGE_DISPLAY_LENGTH]}",
                     str(content)
                 )
-            if model == "reply":
+            if model_name == "reply":
                 self.assertEqual(
                     f"{content.creator}, {content.message[:settings.MESSAGE_DISPLAY_LENGTH]} (For object - {content._content_type.name} | {content.replied_content})"[:100],
                     str(content)
@@ -393,12 +376,12 @@ class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validati
 
             content.update(is_visible=False)
 
-            if model == "pulse":
+            if model_name == "pulse":
                 self.assertEqual(
                     f"{content.creator}, " + "".join(letter + "\u0336" for letter in content.message[:settings.MESSAGE_DISPLAY_LENGTH]),
                     str(content)
                 )
-            if model == "reply":
+            if model_name == "reply":
                 self.assertEqual(
                     (f"{content.creator}, " + "".join(letter + "\u0336" for letter in content.message[:settings.MESSAGE_DISPLAY_LENGTH]) + f" (For object - {content._content_type.name} | {content.replied_content})")[:100],
                     str(content)
@@ -406,72 +389,117 @@ class _User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validati
 
 
 class Report_Model_Tests(Base_TestCase):
-    def test_assigned_staff_is_not_reported_object(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        user2.groups.add(Group.objects.get(name="Moderators"))
+    def test_reported_object_is_not_only_available_assigned_moderator(self):
+        moderator: User = Test_User_Factory.create()
+        moderator.groups.add(Group.objects.get(name="Moderators"))
 
-        with self.assertRaises(ValidationError) as e:
-            Report.objects.create(
-                reporter=user1,
-                _content_type=ContentType.objects.get_for_model(user2),
-                _object_id=user2.id,
-                reason="test reason message",
-                category=Report.Categories.SPAM
+        with self.assertRaisesMessage(ValidationError, "This reported object refers to the only moderator available to be assigned to this report. Therefore, this moderator cannot be reported."):
+            Test_Report_Factory.create(
+                reported_object=moderator
             )
-        self.assertEqual(1, len(e.exception.error_dict))
-        self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
 
-    def test_content_created_by_admin_cannot_be_reported(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        user3 = CreateTestUserHelper.create_test_user()
-        user2.groups.add(Group.objects.get(name="Admins"))
-        user3.groups.add(Group.objects.get(name="Moderators"))
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user2)
+    def test_reported_object_is_not_admin(self):
+        admin: User = Test_User_Factory.create()
+        admin.groups.add(Group.objects.get(name="Admins"))
 
-            with self.assertRaises(ValidationError) as e:
-                Report.objects.create(
-                    reporter=user1,
-                    _content_type=ContentType.objects.get_for_model(content),
-                    _object_id=content.id,
-                    reason="test reason message",
-                    category=Report.Categories.SPAM
-                )
-            self.assertEqual(1, len(e.exception.error_dict))
-            self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
-
-    def test_reported_user_is_not_the_only_moderator(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        user2.groups.add(Group.objects.get(name="Moderators"))
-
-        with self.assertRaises(ValidationError) as e:
-            Report.objects.create(
-                reporter=user1,
-                _content_type=ContentType.objects.get_for_model(user2),
-                _object_id=user2.id,
-                reason="test reason message",
-                category=Report.Categories.SPAM
+        with self.assertRaisesMessage(ValidationError, "This reported object refers to an admin. Admins cannot be reported."):
+            Test_Report_Factory.create(
+                reported_object=admin
             )
-        self.assertEqual(1, len(e.exception.error_dict))
-        self.assertEqual("_object_id", e.exception.error_dict.popitem()[0])
 
-    def test_reporter_is_not_the_only_moderator(self):
-        user1 = CreateTestUserHelper.create_test_user()
-        user2 = CreateTestUserHelper.create_test_user()
-        user2.groups.add(Group.objects.get(name="Moderators"))
-        for model in ["pulse", "reply"]:
-            content = CreateTestUserGeneratedContentHelper.create_test_user_generated_content(model, creator=user1)
+    def test_reported_object_is_not_content_of_admin(self):
+        admin: User = Test_User_Factory.create()
+        admin.groups.add(Group.objects.get(name="Admins"))
 
-            with self.assertRaises(ValidationError) as e:
-                Report.objects.create(
-                    reporter=user2,
-                    _content_type=ContentType.objects.get_for_model(content),
-                    _object_id=content.id,
-                    reason="test reason message",
-                    category=Report.Categories.SPAM
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=admin)
+
+            with self.assertRaisesMessage(ValidationError, "This reported object refers to a Pulse or Reply created by an Admin. These Pulses & Replies cannot be reported."):
+                Test_Report_Factory.create(
+                    reported_object=content
                 )
-            self.assertEqual(1, len(e.exception.error_dict))
-            self.assertEqual("reporter", e.exception.error_dict.popitem()[0])
+
+    def test_reporter_is_not_only_available_assigned_moderator(self):
+        moderator: User = Test_User_Factory.create()
+        moderator.groups.add(Group.objects.get(name="Moderators"))
+
+        with self.assertRaisesMessage(ValidationError, "This user cannot be the reporter because they are the only moderator available to be assigned to this report."):
+            Test_Report_Factory.create(reporter=moderator)
+
+    def test_reported_object_is_not_reporter(self):
+        reported_user: User = Test_User_Factory.create()
+
+        with self.assertRaisesMessage(ValidationError, "You cannot report yourself. Please choose a different object to report."):
+            Test_Report_Factory.create(
+                reporter=reported_user,
+                reported_object=reported_user
+            )
+
+    def test_assigned_moderator_is_consistent(self):
+        moderator1: User = Test_User_Factory.create()
+        moderator2: User = Test_User_Factory.create()
+        moderators_group = Group.objects.get(name="Moderators")
+        moderator1.groups.add(moderators_group)
+        moderator2.groups.add(moderators_group)
+
+        report = Test_Report_Factory.create()
+
+        original_assigned_moderator: User = report.assigned_moderator
+
+        for _ in range(10):
+            report.clean()
+
+            self.assertEqual(original_assigned_moderator, report.assigned_moderator)
+
+    def test_reported_object_is_not_content_of_reporter(self):
+        reporter: User = Test_User_Factory.create()
+
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=reporter)
+
+            with self.assertRaisesMessage(ValidationError, "You cannot report your own content. Please choose a different object to report."):
+                Test_Report_Factory.create(
+                    reporter=reporter,
+                    reported_object=content
+                )
+
+    def test_reported_object_is_not_content_of_only_available_assigned_moderator(self):
+        moderator: User = Test_User_Factory.create()
+        moderator.groups.add(Group.objects.get(name="Moderators"))
+
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=moderator)
+
+            with self.assertRaisesMessage(ValidationError, "This content cannot be reported because it was created by the only moderator available to be assigned to this report."):
+                Test_Report_Factory.create(
+                    reported_object=content
+                )
+
+    def test_reported_object_is_valid(self):
+        for model_name in Report.REPORTABLE_CONTENT_TYPE_NAMES:
+            with self.assertRaisesMessage(ValidationError, "Reported object must be valid object."):
+                Test_Report_Factory.create(
+                    _content_type=ContentType.objects.get(
+                        app_label="pulsifi",
+                        model=model_name
+                    ),
+                    _object_id=0
+                )
+
+    def test_unique_report_per_reporter_and_reported_object(self):
+        reporter: User = Test_User_Factory.create()
+        reported_user: User = Test_User_Factory.create()
+
+        Test_Report_Factory.create(
+            reporter=reporter,
+            reported_object=reported_user
+        )
+
+        with self.assertRaisesMessage(ValidationError, "Same"):
+            Test_Report_Factory.create(
+                reporter=reporter,
+                reported_object=reported_user
+            )

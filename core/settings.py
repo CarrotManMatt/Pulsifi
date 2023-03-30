@@ -40,7 +40,8 @@ env = Env(
     PASSWORD_SIMILARITY_TO_USER_ATTRIBUTES=(float, 0.627),
     USERNAME_SIMILARITY_PERCENTAGE=(int, 87),
     RESTRICTED_ADMIN_USERNAMES=(list, ["pulsifi"]),
-    CUSTOM_RESERVED_USERNAMES=(list, ["puls", "reply"])
+    CUSTOM_RESERVED_USERNAMES=(list, ["puls", "reply"]),
+    TEST_DATA_JSON_FILE_PATH=(str, None)
 )
 
 if env("PRODUCTION"):
@@ -214,6 +215,11 @@ USERNAME_SIMILARITY_PERCENTAGE = env("USERNAME_SIMILARITY_PERCENTAGE")
 RESTRICTED_ADMIN_USERNAMES = set(env("RESTRICTED_ADMIN_USERNAMES"))
 CUSTOM_RESERVED_USERNAMES = set(env("CUSTOM_RESERVED_USERNAMES"))
 FOLLOWER_COUNT_SCALING_FUNCTION = env("FOLLOWER_COUNT_SCALING_FUNCTION")  # TODO: Add function for how delete time of pulses & replies scales with follower count (y=log_2(x+1), y=x, y=xlog_2(x+1), y=2^x-1, y=(x+1)!-1)
+
+# Tests settings
+TEST_DATA_JSON_FILE_PATH = None
+if env("TEST_DATA_JSON_FILE_PATH"):
+    TEST_DATA_JSON_FILE_PATH = Path(env("TEST_DATA_JSON_FILE_PATH"))
 
 # Logging settings
 # noinspection SpellCheckingInspection
