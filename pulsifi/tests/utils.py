@@ -13,7 +13,7 @@ from django.test import TestCase
 
 from pulsifi.models import Pulse, Reply, Report, User
 
-GENERATABLE_MODEL_NAMES: set[str] = {"user", "pulse", "reply", "report"}
+GENERATABLE_MODELS_NAMES: set[str] = {"user", "pulse", "reply", "report"}
 
 TEST_DATA = {}
 if settings.TEST_DATA_JSON_FILE_PATH:

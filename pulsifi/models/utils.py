@@ -9,7 +9,6 @@ from typing import Collection
 from django.conf import settings
 from django.contrib import auth
 from django.contrib.contenttypes.fields import GenericRel, GenericRelation
-from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import ManyToManyField, ManyToManyRel, ManyToOneRel
 
@@ -113,10 +112,7 @@ class Custom_Base_Model(models.Model):
         key: str
         for key, value in kwargs.items():
             if key not in self.get_proxy_field_names():  # NOTE: Given field name must be a proxy field name or an actual field name
-                try:
-                    self._meta.get_field(key)
-                except FieldDoesNotExist:
-                    raise
+                self._meta.get_field(key)  # NOTE: Attempt to get the field by its name (will raise FieldDoesNotExist if no field exists with that name for this model)
             setattr(self, key, value)
 
         if commit:

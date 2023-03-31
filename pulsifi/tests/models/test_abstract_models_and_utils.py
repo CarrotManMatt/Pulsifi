@@ -6,6 +6,8 @@ from typing import Iterable, Type
 
 from django.conf import settings
 from django.contrib import auth
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from pulsifi.models import utils as pulsifi_models_utils
@@ -17,7 +19,10 @@ get_user_model = auth.get_user_model  # NOTE: Adding external package functions 
 
 class Get_Restricted_Admin_Users_Count_Util_Function_Tests(Base_TestCase):
     def test_function_returns_restricted_admin_users_count(self):
-        restricted_admin_usernames: Iterable[str] = itertools.islice(settings.RESTRICTED_ADMIN_USERNAMES, settings.PULSIFI_ADMIN_COUNT)
+        restricted_admin_usernames: Iterable[str] = itertools.islice(
+            settings.RESTRICTED_ADMIN_USERNAMES,
+            settings.PULSIFI_ADMIN_COUNT
+        )
         restricted_admin_usernames_count = 0
 
         restricted_admin_username: str
@@ -71,16 +76,19 @@ class Get_Restricted_Admin_Users_Count_Util_Function_Tests(Base_TestCase):
 class Custom_Base_Model_Tests(Base_TestCase):
     def test_refresh_from_database_updates_non_relation_fields(self):
         model_name: str
-        for model_name in pulsifi_tests_utils.GENERATABLE_MODEL_NAMES:
+        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
             model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
 
             obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
             old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
 
-            self.assertEqual(obj, old_obj)
-
             field: models.Field
             for field in obj.get_non_relation_fields():
+                self.assertEqual(
+                    getattr(old_obj, field.name),
+                    getattr(obj, field.name)
+                )
+
                 if field.name in pulsifi_tests_utils.get_model_factory(model_name).GENERATABLE_FIELDS:
                     setattr(
                         obj,
@@ -104,4 +112,118 @@ class Custom_Base_Model_Tests(Base_TestCase):
                 self.assertEqual(
                     getattr(old_obj, field.name),
                     getattr(obj, field.name)
+                )
+
+    def test_refresh_from_database_updates_single_relation_fields(self):
+        model_name: str
+        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+            model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
+
+            obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
+            old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
+
+            self.assertEqual(obj, old_obj)
+
+            field: models.Field
+            for field in obj.get_single_relation_fields():
+                if field.name.startswith("_"):
+                    continue
+
+                if isinstance(field, GenericForeignKey):
+                    setattr(
+                        obj,
+                        field.name,
+                        pulsifi_tests_utils.get_model_factory(
+                            next(iter(obj._meta.get_field(field.ct_field)._limit_choices_to["model__in"]))
+                        ).create()
+                    )
+
+                elif isinstance(field, models.ForeignKey):
+                    setattr(
+                        obj,
+                        field.name,
+                        pulsifi_tests_utils.get_model_factory(field.related_model._meta.model_name).create()
+                    )
+
+                else:
+                    continue
+
+                self.assertNotEqual(
+                    getattr(obj, field.name),
+                    getattr(old_obj, field.name)
+                )
+
+                obj.refresh_from_db()
+
+                self.assertEqual(
+                    getattr(old_obj, field.name),
+                    getattr(obj, field.name)
+                )
+
+    def test_update(self):
+        model_name: str
+        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+            model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
+            obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
+
+            field: models.Field
+            for field in obj.get_non_relation_fields():
+                old_value = getattr(obj, field.name)
+
+                if field.name in pulsifi_tests_utils.get_model_factory(model_name).GENERATABLE_FIELDS:
+                    try:
+                        obj.update(**{field.name: model_factory.create_field_value(field.name)})
+                    except ValidationError:
+                        continue
+
+                elif isinstance(field, models.BooleanField):
+                    try:
+                        obj.update(**{field.name: not getattr(obj, field.name)})
+                    except ValidationError:
+                        continue
+
+                else:
+                    continue
+
+                self.assertNotEqual(
+                    getattr(obj, field.name),
+                    old_value
+                )
+                self.assertNotEqual(
+                    getattr(obj._meta.model.objects.get(id=obj.id), field.name),
+                    old_value
+                )
+
+    def test_update_without_commit(self):
+        model_name: str
+        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+            model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
+            obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
+
+            field: models.Field
+            for field in obj.get_non_relation_fields():
+                old_value = getattr(obj, field.name)
+
+                if field.name in pulsifi_tests_utils.get_model_factory(model_name).GENERATABLE_FIELDS:
+                    try:
+                        obj.update(commit=False, **{field.name: model_factory.create_field_value(field.name)})
+                    except ValidationError:
+                        continue
+
+                elif isinstance(field, models.BooleanField):
+                    try:
+                        obj.update(commit=False, **{field.name: not getattr(obj, field.name)})
+                    except ValidationError:
+                        continue
+
+                else:
+                    continue
+
+                self.assertNotEqual(
+                    getattr(obj, field.name),
+                    old_value
+                )
+                self.assertEqual(
+                    getattr(obj._meta.model.objects.get(id=obj.id), field.name),
+                    old_value
                 )
