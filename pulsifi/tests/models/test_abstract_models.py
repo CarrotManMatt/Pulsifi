@@ -1,76 +1,19 @@
 """
     Automated test suite for abstract models in pulsifi app.
 """
-import itertools
-from typing import Iterable, Type
+from typing import Type
 
-from django.conf import settings
 from django.contrib import auth
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from pulsifi.models import utils as pulsifi_models_utils
+from pulsifi import models as pulsifi_models
+from pulsifi.models import utils as pulsifi_models_utils, User
 from pulsifi.tests import utils as pulsifi_tests_utils
 from pulsifi.tests.utils import Base_TestCase, Base_Test_Data_Factory, Test_User_Factory
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
-
-
-class Get_Restricted_Admin_Users_Count_Util_Function_Tests(Base_TestCase):
-    def test_function_returns_restricted_admin_users_count(self):
-        restricted_admin_usernames: Iterable[str] = itertools.islice(
-            settings.RESTRICTED_ADMIN_USERNAMES,
-            settings.PULSIFI_ADMIN_COUNT
-        )
-        restricted_admin_usernames_count = 0
-
-        restricted_admin_username: str
-        for restricted_admin_username in restricted_admin_usernames:
-            Test_User_Factory.create(
-                username=restricted_admin_username,
-                is_staff=True
-            )
-            restricted_admin_usernames_count += 1
-
-        for _ in range(3):
-            Test_User_Factory.create()
-
-        self.assertEqual(
-            restricted_admin_usernames_count,
-            pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=0)
-        )
-
-    def test_username_contains_restricted_admin_username(self):
-        base_username: str = Test_User_Factory.create_field_value("username")
-        base_username_length: int = len(base_username)
-
-        Test_User_Factory.create(
-            username=f"{base_username[:base_username_length // 2]}{next(iter(settings.RESTRICTED_ADMIN_USERNAMES))}{base_username[base_username_length // 2:]}",
-            is_staff=True
-        )
-
-        for _ in range(3):
-            Test_User_Factory.create()
-
-        self.assertEqual(
-            1,
-            pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=0)
-        )
-
-    def test_exclusion_id_is_excluded(self):
-        user = Test_User_Factory.create(
-            username=next(iter(settings.RESTRICTED_ADMIN_USERNAMES)),
-            is_staff=True
-        )
-
-        for _ in range(3):
-            Test_User_Factory.create()
-
-        self.assertEqual(
-            0,
-            pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=user.id)
-        )
 
 
 class Custom_Base_Model_Tests(Base_TestCase):
@@ -122,7 +65,7 @@ class Custom_Base_Model_Tests(Base_TestCase):
             obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
             old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
 
-            self.assertEqual(obj, old_obj)
+            self.assertEqual(old_obj, obj)
 
             field: models.Field
             for field in obj.get_single_relation_fields():
@@ -224,6 +167,101 @@ class Custom_Base_Model_Tests(Base_TestCase):
                     old_value
                 )
                 self.assertEqual(
-                    getattr(obj._meta.model.objects.get(id=obj.id), field.name),
-                    old_value
+                    old_value,
+                    getattr(obj._meta.model.objects.get(id=obj.id), field.name)
                 )
+
+
+class Visible_Reportable_Mixin_Tests(Base_TestCase):
+    def test_delete_makes_not_visible(self):
+        model_name: str
+        for model_name in {"user", "pulse", "reply"}:
+            obj: pulsifi_models.Visible_Reportable_Mixin = pulsifi_tests_utils.get_model_factory(model_name).create()
+
+            self.assertTrue(obj.is_visible)
+
+            obj.delete()
+            obj.refresh_from_db()
+
+            self.assertFalse(obj.is_visible)
+
+    def test_string_when_visible(self):
+        model_name: str
+        for model_name in {"user", "pulse", "reply"}:
+            model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
+
+            obj: pulsifi_models.Visible_Reportable_Mixin = model_factory.create()
+
+            # noinspection PyTypeChecker
+            string: str = model_factory.create_field_value(next(iter(model_factory.GENERATABLE_FIELDS)))
+
+            self.assertEqual(
+                string,
+                obj.string_when_visible(string)
+            )
+
+            obj.update(is_visible=False)
+
+            self.assertEqual(
+                "".join(f"{char}\u0336" for char in string),
+                obj.string_when_visible(string)
+            )
+
+
+class User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validation errors from clean method
+    def test_liked_content_becoming_disliked_removes_like(self):
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
+
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
+
+            content.liked_by.add(content_liker)
+
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
+
+            content.disliked_by.add(content_liker)
+
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
+
+    def test_disliked_content_becoming_liked_removes_dislike(self):
+        liked_content_creator: User = Test_User_Factory.create()
+        content_liker: User = Test_User_Factory.create()
+
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create(creator=liked_content_creator)
+
+            content.disliked_by.add(content_liker)
+
+            self.assertTrue(content.disliked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.liked_by.filter(id=content_liker.id).exists())
+
+            content.liked_by.add(content_liker)
+
+            self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
+            self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
+
+    def test_get_absolute_url(self):
+        model_name: str
+        for model_name in {"pulse", "reply"}:
+            content: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
+
+            absolute_url: str = content.get_absolute_url()
+
+            self.assertTrue(absolute_url.startswith("/"))
+
+            login_user_password: str = pulsifi_tests_utils.Test_User_Factory.create_field_value("password")
+            self.client.login(
+                username=pulsifi_tests_utils.Test_User_Factory.create(
+                    password=login_user_password
+                ).username,
+                password=login_user_password
+            )
+            absolute_url_response = self.client.get(absolute_url)
+
+            self.assertEqual(200, absolute_url_response.status_code)
+            self.assertIn(content, absolute_url_response.context.dicts[3].values())

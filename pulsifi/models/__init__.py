@@ -30,7 +30,7 @@ get_user_model = auth.get_user_model  # NOTE: Adding external package functions 
 abstractmethod = abc.abstractmethod
 
 
-class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
+class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
     """
         Model mixin that prevents objects from actually being deleted (making
         them invisible instead), as well as allowing all objects of this type
@@ -112,7 +112,7 @@ class _Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
         return "".join(f"{char}\u0336" for char in string)
 
 
-class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide {just likes}, {likes & {likes of replies}} or {likes, {likes of replies} & replies}) & creator follower count
+class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide {just likes}, {likes & {likes of replies}} or {likes, {likes of replies} & replies}) & creator follower count
     """
         Base model that defines fields for all types of user generated content,
         as well as extra instance methods for retrieving commonly computed
@@ -224,7 +224,7 @@ class User_Generated_Content_Model(_Visible_Reportable_Mixin, pulsifi_models_uti
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
 
 
-class User(_Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick or staff badge next to username
+class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick or staff badge next to username
     """
         Model to define changes to existing fields/extra fields & processing
         for users, beyond that/those given by Django's base :model:`auth.user`
@@ -447,9 +447,8 @@ class User(_Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick
 
         if self.email.count("@") == 1:
             local: str
-            seperator: str
             whole_domain: str
-            local, seperator, whole_domain = self.email.rpartition("@")
+            local, _, whole_domain = self.email.rpartition("@")
 
             extracted_domain: TLD_ExtractResult = tldextract.extract(whole_domain)
 
@@ -466,7 +465,7 @@ class User(_Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick
                 if (pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=self.id) >= settings.PULSIFI_ADMIN_COUNT or not self.is_staff) and restricted_admin_username_in_username:  # NOTE: The email domain can only contain a restricted_admin_username if the user is a staff member & the maximum admin count has not been reached
                     raise ValidationError({"email": f"That Email Address cannot be used."}, code="invalid")
 
-            self.email = seperator.join((local, extracted_domain.fqdn))  # NOTE: Replace the cleaned email address
+            self.email = f"{local}@{extracted_domain.fqdn}"  # NOTE: Replace the cleaned email address
 
         if allauth_core_utils.email_address_exists(self.email, self):
             raise ValidationError({"email": f"That Email Address is already in use by another user."}, code="unique")
