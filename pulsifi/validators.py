@@ -18,8 +18,8 @@ deconstructible = deconstruct.deconstructible
 
 
 @deconstructible
-class ReservedNameValidator:
-    """ Validator which disallows many reserved names as field values. """
+class ReservedUsernameValidator:
+    """ Validator which disallows many reserved usernames as field values. """
 
     # noinspection SpellCheckingInspection
     DEFAULT_SPECIAL_HOSTNAMES = {
@@ -116,7 +116,7 @@ class ReservedNameValidator:
     """ Sensitive filenames. """
 
     # noinspection SpellCheckingInspection
-    DEFAULT_OTHER_SENSITIVE_NAMES = {
+    DEFAULT_OTHER_SENSITIVE_USERNAMES = {
         "account",
         "accounts",
         "auth",
@@ -177,26 +177,26 @@ class ReservedNameValidator:
         "work"
     }
     """
-        Other names which could be problems depending on URL/subdomain
+        Other usernames which could be problems depending on URL/subdomain
         structure.
     """
 
-    def __init__(self, reserved_names: Collection[str] = None) -> None:
-        if reserved_names is None:
-            reserved_names: set[str] = self.DEFAULT_SPECIAL_HOSTNAMES | self.DEFAULT_PROTOCOL_HOSTNAMES | self.DEFAULT_CA_ADDRESSES | self.DEFAULT_RFC_2142 | self.DEFAULT_NOREPLY_ADDRESSES | self.DEFAULT_SENSITIVE_FILENAMES | self.DEFAULT_OTHER_SENSITIVE_NAMES | settings.CUSTOM_RESERVED_USERNAMES
+    def __init__(self, reserved_usernames: Collection[str] = None) -> None:
+        if reserved_usernames is None:
+            reserved_usernames: set[str] = self.DEFAULT_SPECIAL_HOSTNAMES | self.DEFAULT_PROTOCOL_HOSTNAMES | self.DEFAULT_CA_ADDRESSES | self.DEFAULT_RFC_2142 | self.DEFAULT_NOREPLY_ADDRESSES | self.DEFAULT_SENSITIVE_FILENAMES | self.DEFAULT_OTHER_SENSITIVE_USERNAMES | settings.CUSTOM_RESERVED_USERNAMES
         else:
-            reserved_names = set(reserved_names)
-        self.reserved_names = reserved_names
+            reserved_usernames = set(reserved_usernames)
+        self.reserved_usernames = reserved_usernames
 
     def __call__(self, value: str) -> None:
         if not isinstance(value, str):
             return
 
-        if value in self.reserved_names or value.startswith(".well-known"):
-            raise ValidationError("This name is reserved and cannot be registered.", code="invalid")
+        if value in self.reserved_usernames or value.startswith(".well-known"):
+            raise ValidationError("This username is reserved and cannot be registered. Please choose a different username.", code="invalid")
 
     def __eq__(self, other) -> bool:
-        return self.reserved_names == other.reserved_names
+        return self.reserved_usernames == other.reserved_usernames
 
 
 @deconstructible
@@ -315,19 +315,18 @@ class PreexistingEmailTLDValidator:
             return
 
         local: str
-        seperator: str
         domain: str
-        local, seperator, domain = value.rpartition("@")
+        local, _, domain = value.rpartition("@")
 
-        if get_user_model().objects.exclude(email=value).filter(email__icontains=seperator.join((local, tldextract.extract(domain).domain))).exists():
-            raise ValidationError(f"The Email Address: {value} is already in use by another user.", code="unique")
+        if get_user_model().objects.exclude(email=value).filter(email__icontains=f"{local}@{tldextract.extract(domain).domain}").exists():
+            raise ValidationError("That Email Address is already in use by another user.", code="unique")
 
 
 @deconstructible
-class ConfusableStringValidator:
+class ConfusableUsernameValidator:
     """
-        Validator which disallows 'dangerous' strings likely to represent
-        homograph attacks. A string is 'dangerous' if it is mixed-script (as
+        Validator which disallows 'dangerous' usernames likely to represent
+        homograph attacks. A username is 'dangerous' if it is mixed-script (as
         defined by Unicode 'Script' property) and contains one or more
         characters appearing in the Unicode Visually Confusable Characters
         file.
@@ -338,7 +337,7 @@ class ConfusableStringValidator:
             return
 
         if confusables.is_dangerous(value):
-            raise ValidationError("This name cannot be registered. Please choose a different name.", code="invalid")
+            raise ValidationError("This username cannot be registered. Please choose a different username.", code="invalid")
 
 
 @deconstructible

@@ -15,6 +15,7 @@ from pulsifi import models as pulsifi_models
 from pulsifi.models import Follow, Report, User, Pulse, Reply
 from pulsifi.tests import utils as pulsifi_tests_utils
 from pulsifi.tests.utils import Base_TestCase, Test_Report_Factory, Test_User_Factory
+from pulsifi.validators import ReservedUsernameValidator, FreeEmailValidator, ExampleEmailValidator
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -22,6 +23,123 @@ get_user_model = auth.get_user_model  # NOTE: Adding external package functions 
 # TODO: tests docstrings
 
 class User_Model_Tests(Base_TestCase):  # TODO: test validators & validation errors from clean method, test if username length check is working for in-code user creation
+    def test_username_validate_regex(self):
+        invalid_char: str
+        for invalid_char in {"@", "%", ",", "-", "=", "?", " ", "#", "!", "&", "<", ">", "^", "*", "$", "£", "`", "/", "\\"}:
+            with self.assertRaisesMessage(ValidationError, "Enter a valid username. It must contain only letters, digits, '.' and '_'characters."):
+                pulsifi_tests_utils.Test_User_Factory.create(
+                    username=f"""{pulsifi_tests_utils.Test_User_Factory.create_field_value("username")}{invalid_char}"""
+                )
+
+        valid_char: str
+        for valid_char in {".", "_"}:
+            try:
+                pulsifi_tests_utils.Test_User_Factory.create(
+                    username=f"""{pulsifi_tests_utils.Test_User_Factory.create_field_value("username")}{valid_char}"""
+                )
+            except ValidationError:
+                self.fail()
+
+    def test_username_validate_not_reserved_username(self):
+        with self.assertRaisesMessage(ValidationError, "This username is reserved and cannot be registered. Please choose a different username."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                username=next(iter(ReservedUsernameValidator().reserved_usernames))
+            )
+
+    def test_username_validate_not_confusable(self):
+        with self.assertRaisesMessage(ValidationError, "This username cannot be registered. Please choose a different username."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                username=f"""{pulsifi_tests_utils.Test_User_Factory.create_field_value("username")}а"""
+            )
+
+    def test_username_validate_min_length(self):
+        with self.assertRaisesMessage(ValidationError, "Username must have at least 4 characters."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                username=pulsifi_tests_utils.Test_User_Factory.create_field_value("username")[:3]
+            )
+
+    def test_username_unique(self):
+        user: User = pulsifi_tests_utils.Test_User_Factory.create()
+
+        with self.assertRaisesMessage(ValidationError, "A user with that username already exists."):
+            pulsifi_tests_utils.Test_User_Factory.create(username=user.username)
+
+    def test_username_not_empty(self):
+        user: User = pulsifi_tests_utils.Test_User_Factory.create()
+
+        with self.assertRaisesMessage(ValidationError, "Username is a required field."):
+            user.update(username=None)
+
+        with self.assertRaisesMessage(ValidationError, "Username is a required field."):
+            user.update(username="")
+
+    def test_email_validate_html5_email(self):
+        with self.assertRaisesMessage(ValidationError, "Enter a valid email address."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=pulsifi_tests_utils.Test_User_Factory.create_field_value("username")
+            )
+
+    def test_email_validate_not_free_email(self):
+        with self.assertRaisesMessage(ValidationError, "Registration using free email addresses is prohibited. Please supply a different email address."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=f"local@{next(iter(FreeEmailValidator().free_email_domains))}"
+            )
+
+    def test_email_validate_local_confusable(self):
+        with self.assertRaisesMessage(ValidationError, "This email address cannot be registered. Please supply a different email address."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=f"locаl@yahoo.com"
+            )
+
+    def test_email_validate_domain_confusable(self):
+        with self.assertRaisesMessage(ValidationError, "This email address cannot be registered. Please supply a different email address."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=f"local@yаhoo.com"
+            )
+
+    def test_email_validate_not_preexisting_with_tld(self):
+        tld: str = "yahoo.com"
+
+        pulsifi_tests_utils.Test_User_Factory.create(email=f"local@{tld}")
+
+        with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=f"local@me.test.{tld}"
+            )
+
+    def test_email_validate_not_example_email(self):
+        with self.assertRaisesMessage(ValidationError, "Registration using unresolvable example email addresses is prohibited. Please supply a different email address."):
+            pulsifi_tests_utils.Test_User_Factory.create(
+                email=f"local@{next(iter(ExampleEmailValidator().example_email_domains))}"
+            )
+
+    def test_email_not_empty(self):
+        user: User = pulsifi_tests_utils.Test_User_Factory.create()
+
+        with self.assertRaisesMessage(ValidationError, "Email Address is a required field."):
+            user.update(email=None)
+
+        with self.assertRaisesMessage(ValidationError, "Email Address is a required field."):
+            user.update(email="")
+
+    def test_valid_email(self):
+        user: User = pulsifi_tests_utils.Test_User_Factory.create(
+            email="local@me.test.yahoo.com"
+        )
+
+        self.assertEqual("local@me.test.yahoo.com", user.email)
+
+    def test_bio_not_null(self):
+        user: User = pulsifi_tests_utils.Test_User_Factory.create()
+
+        with self.assertRaisesMessage(IntegrityError, "bio"), transaction.atomic():
+            user.update(bio=None)
+
+        try:
+            user.update(bio="")
+        except (ValidationError, IntegrityError):
+            self.fail()
+
     def test_delete_makes_not_active(self):
         user = Test_User_Factory.create()
 
@@ -62,7 +180,7 @@ class User_Model_Tests(Base_TestCase):  # TODO: test validators & validation err
         user.update(is_active=False)
 
         self.assertEqual(
-            "".join(letter + "\u0336" for letter in f"@{user.username}"),
+            "".join(char + "\u0336" for char in f"@{user.username}"),
             str(user)
         )
 
@@ -245,13 +363,13 @@ class User_Model_Tests(Base_TestCase):  # TODO: test validators & validation err
         except ValidationError:
             self.fail()
 
-    def test_verify_not_duplicate_email_attribute(self):
+    def test_email_validate_attribute_unique(self):
         user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(ValidationError, "That Email Address is already in use by another user."):
             Test_User_Factory.create(email=user.email)
 
-    def test_verify_not_duplicate_email_object(self):
+    def test_email_object_not_already_exists(self):
         user = Test_User_Factory.create()
         allauth_utils.sync_user_email_addresses(user)
         old_email = user.email
@@ -336,7 +454,7 @@ class Pulse_Model_Tests(Base_TestCase):
 
         pulse.update(is_visible=False)
 
-        message: str = "".join(letter + "\u0336" for letter in pulse.message[:settings.MESSAGE_DISPLAY_LENGTH])
+        message: str = "".join(char + "\u0336" for char in pulse.message[:settings.MESSAGE_DISPLAY_LENGTH])
         self.assertEqual(
             f"{pulse.creator}, {message}",
             str(pulse)
@@ -354,7 +472,7 @@ class Reply_Model_Tests(Base_TestCase):
 
         reply.update(is_visible=False)
 
-        message: str = "".join(letter + "\u0336" for letter in reply.message[:settings.MESSAGE_DISPLAY_LENGTH])
+        message: str = "".join(char + "\u0336" for char in reply.message[:settings.MESSAGE_DISPLAY_LENGTH])
         self.assertEqual(
             f"{reply.creator}, {message} (For object - {reply._content_type.name} | {reply.replied_content})"[:100],
             str(reply)

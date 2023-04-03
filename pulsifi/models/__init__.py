@@ -17,14 +17,14 @@ from django.contrib.auth.models import AbstractUser, Group
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinLengthValidator
 from django.db import models
 from django.utils import timezone
 from thefuzz import fuzz as thefuzz
 from tldextract.tldextract import ExtractResult as TLD_ExtractResult
 
 from pulsifi.models import utils as pulsifi_models_utils
-from pulsifi.validators import ConfusableEmailValidator, ConfusableStringValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedNameValidator
+from pulsifi.validators import ConfusableEmailValidator, ConfusableUsernameValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedUsernameValidator
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 abstractmethod = abc.abstractmethod
@@ -296,14 +296,20 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
         unique=True,
         validators=[
             RegexValidator(
-                r"^[\w.-]+\Z",
-                "Enter a valid username. This value may contain only letters, digits and ./_ characters."
+                r"^[\w._]+\Z",
+                "Enter a valid username. It must contain only letters, digits, '.' and '_'characters."
             ),
-            ReservedNameValidator(),
-            ConfusableStringValidator()
+            ReservedUsernameValidator(),
+            ConfusableUsernameValidator(),
+            MinLengthValidator(
+                4,
+                "Username must have at least 4 characters."
+            )
         ],
         error_messages={
-            "unique": "A user with that username already exists."
+            "unique": "A user with that username already exists.",
+            "null": "Username is a required field.",
+            "blank": "Username is a required field."
         },
         null=False,
         blank=False
@@ -319,7 +325,9 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             ExampleEmailValidator()
         ],
         error_messages={
-            "unique": f"That Email Address is already in use by another user."
+            "unique": f"That Email Address is already in use by another user.",
+            "null": "Email Address is a required field.",
+            "blank": "Email Address is a required field."
         },
         null=False,
         blank=False
@@ -327,6 +335,8 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
     bio = models.TextField(
         "Bio",
         max_length=200,
+        error_messages={"null": "Bio field cannot be null, use an empty string instead."},
+        null=False,
         blank=True,
         help_text="Longer textfield containing an autobiographical description of this user."
     )
@@ -440,12 +450,13 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             if (pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=self.id) >= settings.PULSIFI_ADMIN_COUNT or not self.is_staff) and restricted_admin_username_in_username:  # NOTE: The username can only contain a restricted_admin_username if the user is a staff member & the maximum admin count has not been reached
                 raise ValidationError({"username": "That username is not allowed."}, code="invalid")
 
-        username: str
-        for username in get_user_model().objects.exclude(id=self.id).values_list("username", flat=True):  # NOTE: Check this username is not too similar to any other username (apart from this user's existing email)
-            if thefuzz.token_sort_ratio(self.username, username) >= settings.USERNAME_SIMILARITY_PERCENTAGE:
-                raise ValidationError({"username": "That username is too similar to a username belonging to an existing user."}, code="unique")
+        if not get_user_model().objects.filter(username=self.username).exclude(id=self.id).exists():
+            username: str
+            for username in get_user_model().objects.exclude(id=self.id).values_list("username", flat=True):  # NOTE: Check this username is not too similar to any other username (apart from this user's existing email)
+                if thefuzz.token_sort_ratio(self.username, username) >= settings.USERNAME_SIMILARITY_PERCENTAGE:
+                    raise ValidationError({"username": "That username is too similar to a username belonging to an existing user."}, code="unique")
 
-        if self.email.count("@") == 1:
+        if self.email and self.email.count("@") == 1:
             local: str
             whole_domain: str
             local, _, whole_domain = self.email.rpartition("@")

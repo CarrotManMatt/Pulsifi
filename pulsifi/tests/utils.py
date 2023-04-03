@@ -11,6 +11,7 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
+from pulsifi.exceptions import NotEnoughTestDataError
 from pulsifi.models import Pulse, Reply, Report, User
 
 GENERATABLE_MODELS_NAMES: set[str] = {"user", "pulse", "reply", "report"}
@@ -192,13 +193,25 @@ class Test_User_Factory(Base_Test_Data_Factory):
     @classmethod
     def _create_field_value(cls, field_name: str) -> str:
         if field_name == "username":
-            return next(cls.test_usernames_iterator)
+            try:
+                return next(cls.test_usernames_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
         elif field_name == "password":
-            return next(cls.test_passwords_iterator)
+            try:
+                return next(cls.test_passwords_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
         elif field_name == "email":
-            return next(cls.test_emails_iterator)
+            try:
+                return next(cls.test_emails_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
         elif field_name == "bio":
-            return next(cls.test_bios_iterator)
+            try:
+                return next(cls.test_bios_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
 
 
 class Base_Test_User_Generated_Content_Factory(Base_Test_Data_Factory, abc.ABC):
@@ -222,7 +235,10 @@ class Base_Test_User_Generated_Content_Factory(Base_Test_Data_Factory, abc.ABC):
     @classmethod
     def _create_field_value(cls, field_name: str) -> str:
         if field_name == "message":
-            return next(cls.test_messages_iterator)
+            try:
+                return next(cls.test_messages_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
 
 
 class Test_Pulse_Factory(Base_Test_User_Generated_Content_Factory):
@@ -415,4 +431,7 @@ class Test_Report_Factory(Base_Test_Data_Factory):
     @classmethod
     def _create_field_value(cls, field_name: str) -> str:
         if field_name == "reason":
-            return next(cls.test_reasons_iterator)
+            try:
+                return next(cls.test_reasons_iterator)
+            except StopIteration as e:
+                raise NotEnoughTestDataError(field_name=field_name) from e
