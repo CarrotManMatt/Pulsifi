@@ -168,10 +168,10 @@ class Test_User_Factory(Base_Test_Data_Factory):
         bio: str = kwargs.pop("bio", None) or cls.create_field_value("bio")
 
         is_active: bool | None = kwargs.get("is_active", None)
-        visible: bool | None = kwargs.pop("visible", None)
+        is_visible: bool | None = kwargs.pop("is_visible", None)
 
-        if is_active != visible and is_active is not None and visible is not None:
-            raise ValueError("User attribute <is_active> cannot be set to a different value from the User attribute <visible>.")
+        if is_active != is_visible and is_active is not None and is_visible is not None:
+            raise ValueError("User attribute <is_active> cannot be set to a different value from the User attribute <is_visible>.")
 
         if save:
             return get_user_model().objects.create_user(
@@ -264,12 +264,12 @@ class Test_Pulse_Factory(Base_Test_User_Generated_Content_Factory):
         message: str = kwargs.pop("message", None) or cls.create_field_value("message")
 
         pulse_kwargs: dict[str, ...] = {}
-        if (visible := kwargs.pop("visible", None)) is not None:
-            pulse_kwargs["visible"] = visible
+        if (is_visible := kwargs.pop("is_visible", None)) is not None:
+            pulse_kwargs["is_visible"] = is_visible
 
         creator_kwargs: dict[str, ...] = kwargs.copy()
-        if (creator_visible := kwargs.pop("creator_visible", None)) is not None:
-            creator_kwargs["visible"] = creator_visible
+        if (creator__is_visible := kwargs.pop("creator__is_visible", None)) is not None:
+            creator_kwargs["is_visible"] = creator__is_visible
 
         creator: User = kwargs.pop("creator", None) or Test_User_Factory.create(**creator_kwargs)
 
@@ -310,39 +310,46 @@ class Test_Reply_Factory(Base_Test_User_Generated_Content_Factory):
         message: str = kwargs.pop("message", None) or cls.create_field_value("message")
 
         reply_kwargs: dict[str, ...] = {}
-        if (visible := kwargs.pop("visible", None)) is not None:
-            reply_kwargs["visible"] = visible
+        if (is_visible := kwargs.pop("is_visible", None)) is not None:
+            reply_kwargs["is_visible"] = is_visible
+        if (replied_content := kwargs.pop("replied_content", None)) is not None:
+            reply_kwargs["replied_content"] = replied_content
+        if (_content_type := kwargs.pop("_content_type", None)) is not None:
+            reply_kwargs["_content_type"] = _content_type
+        if (_content_type_id := kwargs.pop("_content_type_id", None)) is not None:
+            reply_kwargs["_content_type_id"] = _content_type_id
+        if (_object_id := kwargs.pop("_object_id", None)) is not None:
+            reply_kwargs["_object_id"] = _object_id
 
         creator_kwargs: dict[str, ...] = {}
         field_name: str
         for field_name in get_user_model().get_non_relation_fields(names=True) - (Pulse.get_non_relation_fields(names=True) | Reply.get_non_relation_fields(names=True)):
-            if (field_value := kwargs.pop(field_name, None)) is not None:
+            if (field_value := kwargs.pop(f"creator__{field_name}", None)) is not None:
                 creator_kwargs[field_name] = field_value
-        if (creator_visible := kwargs.pop("creator_visible", None)) is not None:
-            creator_kwargs["visible"] = creator_visible
+        if (creator__is_visible := kwargs.pop("creator__is_visible", None)) is not None:
+            creator_kwargs["is_visible"] = creator__is_visible
 
         creator: User = kwargs.pop("creator", None) or Test_User_Factory.create(**creator_kwargs)
 
         replied_content_kwargs: dict[str, ...] = kwargs.copy()
-        if (replied_content_message := kwargs.pop("replied_content_message", None)) is not None:
-            replied_content_kwargs["message"] = replied_content_message
-        if (replied_content_visible := kwargs.pop("replied_content_visible", None)) is not None:
-            replied_content_kwargs["visible"] = replied_content_visible
+        if (replied_content__message := kwargs.pop("replied_content__message", None)) is not None:
+            replied_content_kwargs["message"] = replied_content__message
+        if (replied_content__is_visible := kwargs.pop("replied_content__is_visible", None)) is not None:
+            replied_content_kwargs["is_visible"] = replied_content__is_visible
 
-        replied_content: Pulse | Reply = kwargs.pop("replied_content", None) or Test_Pulse_Factory.create(**replied_content_kwargs)
+        if (replied_content is None and _content_type is None and _content_type_id is None) or (replied_content is None and _object_id is None):
+            reply_kwargs["replied_content"] = Test_Pulse_Factory.create(**replied_content_kwargs)
 
         if save:
             return Reply.objects.create(
                 message=message,
                 creator=creator,
-                replied_content=replied_content,
                 **reply_kwargs
             )
         else:
             return Reply(
                 message=message,
                 creator=creator,
-                replied_content=replied_content,
                 **reply_kwargs
             )
 
@@ -387,6 +394,8 @@ class Test_Report_Factory(Base_Test_Data_Factory):
             report_kwargs["reported_object"] = reported_object
         if (_content_type := kwargs.pop("_content_type", None)) is not None:
             report_kwargs["_content_type"] = _content_type
+        if (_content_type_id := kwargs.pop("_content_type_id", None)) is not None:
+            report_kwargs["_content_type_id"] = _content_type_id
         if (_object_id := kwargs.pop("_object_id", None)) is not None:
             report_kwargs["_object_id"] = _object_id
 
@@ -395,8 +404,8 @@ class Test_Report_Factory(Base_Test_Data_Factory):
         for field_name in get_user_model().get_non_relation_fields(names=True) - (Pulse.get_non_relation_fields(names=True) | Reply.get_non_relation_fields(names=True)):
             if (field_value := kwargs.pop(field_name, None)) is not None:
                 reporter_kwargs[field_name] = field_value
-        if (reporter_visible := kwargs.pop("reporter_visible", None)) is not None:
-            reporter_kwargs["visible"] = reporter_visible
+        if (reporter__is_visible := kwargs.pop("reporter__is_visible", None)) is not None:
+            reporter_kwargs["is_visible"] = reporter__is_visible
 
         reporter: User = kwargs.pop("reporter", None) or Test_User_Factory.create(**reporter_kwargs)
 
@@ -404,7 +413,7 @@ class Test_Report_Factory(Base_Test_Data_Factory):
         if (reported_object_visible := kwargs.pop("reported_object_visible", None)) is not None:
             reported_object_kwargs["visible"] = reported_object_visible
 
-        if reported_object is None and _content_type is None and _object_id is None:
+        if (reported_object is None and _content_type is None and _content_type_id is None) or (reported_object is None and _object_id is None):
             report_kwargs["reported_object"] = Test_Pulse_Factory.create(**reported_object_kwargs)
 
         if not get_user_model().objects.filter(groups__name="Moderators").exists():
