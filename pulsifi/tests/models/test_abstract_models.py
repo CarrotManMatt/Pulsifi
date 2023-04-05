@@ -60,9 +60,7 @@ class Custom_Base_Model_Tests(Base_TestCase):
     def test_refresh_from_database_updates_single_relation_fields(self):
         model_name: str
         for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
-            model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
-
-            obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
+            obj: pulsifi_models_utils.Custom_Base_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
             old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
 
             self.assertEqual(old_obj, obj)
@@ -207,8 +205,29 @@ class Visible_Reportable_Mixin_Tests(Base_TestCase):
                 obj.string_when_visible(string)
             )
 
+    def test_get_absolute_url(self):
+        model_name: str
+        for model_name in {"user", "pulse", "reply"}:
+            obj: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
 
-class User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validation errors from clean method
+            absolute_url: str = obj.get_absolute_url()
+
+            self.assertTrue(absolute_url.startswith("/"))
+
+            login_user_password: str = pulsifi_tests_utils.Test_User_Factory.create_field_value("password")
+            self.client.login(
+                username=pulsifi_tests_utils.Test_User_Factory.create(
+                    password=login_user_password
+                ).username,
+                password=login_user_password
+            )
+            absolute_url_response = self.client.get(absolute_url)
+
+            self.assertEqual(200, absolute_url_response.status_code)
+            self.assertIn(obj, absolute_url_response.context.dicts[3].values())
+
+
+class User_Generated_Content_Model_Tests(Base_TestCase):
     def test_liked_content_becoming_disliked_removes_like(self):
         liked_content_creator: User = Test_User_Factory.create()
         content_liker: User = Test_User_Factory.create()
@@ -244,24 +263,3 @@ class User_Generated_Content_Model_Tests(Base_TestCase):  # TODO: test validatio
 
             self.assertTrue(content.liked_by.filter(id=content_liker.id).exists())
             self.assertFalse(content.disliked_by.filter(id=content_liker.id).exists())
-
-    def test_get_absolute_url(self):
-        model_name: str
-        for model_name in {"pulse", "reply"}:
-            content: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
-
-            absolute_url: str = content.get_absolute_url()
-
-            self.assertTrue(absolute_url.startswith("/"))
-
-            login_user_password: str = pulsifi_tests_utils.Test_User_Factory.create_field_value("password")
-            self.client.login(
-                username=pulsifi_tests_utils.Test_User_Factory.create(
-                    password=login_user_password
-                ).username,
-                password=login_user_password
-            )
-            absolute_url_response = self.client.get(absolute_url)
-
-            self.assertEqual(200, absolute_url_response.status_code)
-            self.assertIn(content, absolute_url_response.context.dicts[3].values())
