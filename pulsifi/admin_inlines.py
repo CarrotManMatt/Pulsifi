@@ -86,7 +86,7 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
             admin page.
         """
 
-        return str(len(obj.full_depth_replies))
+        return str(len(obj.get_full_depth_replies()))
 
 
 class _Created_User_Content_Inline(_Base_User_Content_Inline_Config, admin.StackedInline):

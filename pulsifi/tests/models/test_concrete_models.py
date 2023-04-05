@@ -279,13 +279,15 @@ class User_Model_Tests(Base_TestCase):  # TODO: test validators & validation err
         user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
-            user.add_following(user)
+            # noinspection DjangoOrm
+            user.following.add(user)
 
     def test_user_cannot_be_in_own_followers(self):
         user = Test_User_Factory.create()
 
         with self.assertRaisesMessage(IntegrityError, "CHECK constraint failed: not_follow_self"), transaction.atomic():
-            user.add_followers(user)
+            # noinspection DjangoOrm
+            user.followers.add(user)
 
     def test_staff_can_have_restricted_admin_username(self):
         for restricted_admin_username in list(settings.RESTRICTED_ADMIN_USERNAMES)[:settings.PULSIFI_ADMIN_COUNT]:

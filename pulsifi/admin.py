@@ -148,7 +148,7 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
             page.
         """
 
-        return len(obj.full_depth_replies)
+        return len(obj.get_full_depth_replies())
 
     def get_readonly_fields(self, request: HttpRequest, obj: Pulse | Reply = None) -> Sequence[str]:
         """
@@ -245,7 +245,7 @@ class Pulse_Admin(_User_Content_Admin):
         ("Replies", {
             "fields": (
                 ("display_direct_replies_count",
-                 "display_full_depth_replies_count")
+                "display_full_depth_replies_count")
             )
         }),
         (None, {

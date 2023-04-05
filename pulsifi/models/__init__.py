@@ -187,16 +187,6 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
 
         raise NotImplementedError
 
-    @property
-    @abstractmethod
-    def full_depth_replies(self) -> set["Reply"]:
-        """
-            The set of all :model:`pulsifi.reply` objects that are within the
-            tree of this instance's children/children's children etc.
-        """
-
-        raise NotImplementedError
-
     # noinspection PyMissingOrEmptyDocstring
     class Meta:
         abstract = True
@@ -222,6 +212,15 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
         """
 
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
+
+    @abstractmethod
+    def get_full_depth_replies(self) -> set["Reply"]:
+        """
+            Returns the set of all :model:`pulsifi.reply` objects that are within the
+            tree of this instance's children/children's children etc.
+        """
+
+        raise NotImplementedError
 
 
 class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick or staff badge next to username
@@ -450,10 +449,10 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             if (pulsifi_models_utils.get_restricted_admin_users_count(exclusion_id=self.id) >= settings.PULSIFI_ADMIN_COUNT or not self.is_staff) and restricted_admin_username_in_username:  # NOTE: The username can only contain a restricted_admin_username if the user is a staff member & the maximum admin count has not been reached
                 raise ValidationError({"username": "That username is not allowed."}, code="invalid")
 
-        if not get_user_model().objects.filter(username=self.username).exclude(id=self.id).exists():
-            username: str
-            for username in get_user_model().objects.exclude(id=self.id).values_list("username", flat=True):  # NOTE: Check this username is not too similar to any other username (apart from this user's existing email)
-                if thefuzz.token_sort_ratio(self.username, username) >= settings.USERNAME_SIMILARITY_PERCENTAGE:
+        if not get_user_model().objects.filter(username=self.username).exclude(id=self.id).exists():  # NOTE: Only validate username similarity if the username is unique
+            similar_username: str
+            for similar_username in get_user_model().objects.exclude(id=self.id).values_list("username", flat=True):  # NOTE: Check this username is not too similar to any other username (apart from this user's existing email)
+                if thefuzz.token_sort_ratio(self.username, similar_username) >= settings.USERNAME_SIMILARITY_PERCENTAGE:
                     raise ValidationError({"username": "That username is too similar to a username belonging to an existing user."}, code="unique")
 
         if self.email and self.email.count("@") == 1:
@@ -469,7 +468,10 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
                 local = local.partition("+")[0]  # NOTE: Format the local part of the email address to remove any part after a plus symbol
 
             if extracted_domain.domain == "googlemail":  # NOTE: Rename alias email domains (E.g. googlemail == gmail)
-                extracted_domain = TLD_ExtractResult(subdomain=extracted_domain.subdomain, domain="gmail", suffix=extracted_domain.suffix)
+                extracted_domain = TLD_ExtractResult(
+                    subdomain=extracted_domain.subdomain, domain="gmail",
+                    suffix=extracted_domain.suffix
+                )
 
             else:
                 restricted_admin_username_in_username = any(restricted_admin_username in extracted_domain.domain for restricted_admin_username in settings.RESTRICTED_ADMIN_USERNAMES)
@@ -482,7 +484,7 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             raise ValidationError({"email": f"That Email Address is already in use by another user."}, code="unique")
 
         if self.is_verified and not allauth_utils.has_verified_email(self):
-            raise ValidationError({"is_verified": "User cannot become verified without at least one verified email address."})
+            raise ValidationError({"is_verified": "User cannot become verified without at least one verified email address."}, code="invalid")
 
         super().clean()
 
@@ -549,22 +551,6 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
         return Pulse.objects.filter(
             creator__in=self.following.exclude(is_active=False)
         ).order_by("_date_time_created")
-
-    def add_following(self, *objs, bulk=True) -> None:
-        """
-            Adds the provided User objects to the set of other
-            :model:`pulsifi.user` objects that this user is following.
-        """
-
-        self.following.add(*objs, bulk, through_defaults=dict())
-
-    def add_followers(self, *objs, bulk=True) -> None:
-        """
-            Adds the provided User objects to the set of other
-            :model:`pulsifi.user` objects that are following this user.
-        """
-
-        self.followers.add(*objs, bulk, through_defaults=dict())
 
     @classmethod
     def get_proxy_field_names(cls) -> set[str]:
@@ -651,11 +637,11 @@ class Pulse(User_Generated_Content_Model):
             pass
         else:
             if not self.is_visible and old_is_visible:
-                for reply in self.full_depth_replies:
+                for reply in self.get_full_depth_replies():
                     reply.update(base_save=True, is_visible=False)
 
             elif self.is_visible and not old_is_visible:
-                for reply in self.full_depth_replies:
+                for reply in self.get_full_depth_replies():
                     reply.update(base_save=True, is_visible=True)
 
         super().save(*args, **kwargs)
@@ -673,14 +659,13 @@ class Pulse(User_Generated_Content_Model):
 
         return self
 
-    @property
-    def full_depth_replies(self) -> set["Reply"]:
+    def get_full_depth_replies(self) -> set["Reply"]:
         """
-            The set of all :model:`pulsifi.reply` objects that are within the
+            Returns the set of all :model:`pulsifi.reply` objects that are within the
             tree of this instance's children/children's children etc.
         """
 
-        return {reply for reply in Reply.objects.all() if reply.original_pulse is self}
+        return {reply for reply in Reply.objects.all() if reply.original_pulse.id == self.id}
 
 
 class Reply(User_Generated_Content_Model):
@@ -691,10 +676,12 @@ class Reply(User_Generated_Content_Model):
         :model:`pulsifi.pulse`).
     """
 
+    REPLYABLE_CONTENT_TYPE_NAMES = {"pulse", "reply"}
+
     _content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
-        limit_choices_to={"app_label": "pulsifi", "model__in": {"pulse", "reply"}},
+        limit_choices_to={"app_label": "pulsifi", "model__in": REPLYABLE_CONTENT_TYPE_NAMES},
         verbose_name="Replied Content Type",
         help_text="Link to the content type of the replied_content instance (either :model:`pulsifi.pulse` or :model:`pulsifi.reply`).",
         null=False,
@@ -727,20 +714,6 @@ class Reply(User_Generated_Content_Model):
 
         return self.replied_content.original_pulse
 
-    @property
-    def full_depth_replies(self) -> set["Reply"]:
-        """
-            The set of all :model:`pulsifi.reply` objects that are within the
-            tree of this instance's children/children's children etc.
-        """
-
-        replies = set()
-        reply: "Reply"
-        for reply in self.reply_set.all():
-            replies.add(reply)  # NOTE: Add the current level :model:`pulsifi.reply` objects to the set
-            replies.update(reply.full_depth_replies)  # NOTE: Add the child :model:`pulsifi.reply` objects recursively to the set
-        return replies
-
     # noinspection PyMissingOrEmptyDocstring
     class Meta:
         verbose_name = "Reply"
@@ -761,15 +734,15 @@ class Reply(User_Generated_Content_Model):
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
-        if self._content_type and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
-            if self._content_type.model not in {"pulse", "reply"}:
-                raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: Pulse, Reply."}, code="invalid")
+        if self._content_type_id and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
+            if self._content_type.model not in self.REPLYABLE_CONTENT_TYPE_NAMES:
+                raise ValidationError({"_content_type": f"The Content Type: {self._content_type.name} is not one of the allowed options: Pulse, Reply."}, code="invalid")
 
             if self._content_type.model == "reply" and self._object_id == self.id:
-                raise ValidationError({"_object_id": "Replied content cannot be this Reply."}, code="invalid")
+                raise ValidationError({"_object_id": "Replied content cannot be this own Reply."}, code="invalid")
 
             if (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):
-                raise ValidationError("Replied content must be valid object.")
+                raise ValidationError("Replied content must be valid object.", code="invalid")
 
         else:
             logging.warning(f"Replied object of {repr(self)} could not be correctly verified because _content_type and _object_id fields were not set, when cleaning. It is likely that this happened within an AdminInline, so it can be assumed that the input data is valid anyway.")
@@ -795,6 +768,19 @@ class Reply(User_Generated_Content_Model):
             logging.warning(f"Visibility of original_pulse could not be correctly retrieved because _content_type and _object_id fields were not set, when updating reply visibility to match original_pulse's visibility. It is likely that this happened within an AdminInline.")
 
         self.base_save(clean=False, *args, **kwargs)
+
+    def get_full_depth_replies(self) -> set["Reply"]:
+        """
+            Returns the set of all :model:`pulsifi.reply` objects that are within the
+            tree of this instance's children/children's children etc.
+        """
+
+        replies = set()
+        reply: "Reply"
+        for reply in self.reply_set.all():
+            replies.add(reply)  # NOTE: Add the current level :model:`pulsifi.reply` objects to the set
+            replies.update(reply.get_full_depth_replies())  # NOTE: Add the child :model:`pulsifi.reply` objects recursively to the set
+        return replies
 
     def get_latest_reply_of_same_original_pulse(self) -> "Reply":
         """
@@ -954,12 +940,12 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
 
-        if self._content_type and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
+        if self._content_type_id and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
             if self._content_type.model not in self.REPORTABLE_CONTENT_TYPE_NAMES:
-                raise ValidationError({"_content_type": f"The Content Type: {self._content_type} is not one of the allowed options: User, Pulse, Reply."}, code="invalid")
+                raise ValidationError({"_content_type": f"The Content Type: {self._content_type.name} is not one of the allowed options: User, Pulse, Reply."}, code="invalid")
 
             if (self._content_type.model == "user" and not get_user_model().objects.filter(id=self._object_id).exists()) or (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):  # TODO: Check if this validation is needed or just inbuilt
-                raise ValidationError("Reported object must be valid object.")
+                raise ValidationError("Reported object must be valid object.", code="invalid")
 
             if self._content_type.model in {"pulse", "reply"}:
                 if self.reported_object.creator.is_superuser or self.reported_object.creator.groups.filter(name="Admins").exists():
@@ -1002,7 +988,9 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
         """
 
         # noinspection PyProtectedMember
-        moderator_qs: models.QuerySet[User] = get_user_model().objects.filter(**cls._meta.get_field("assigned_moderator")._limit_choices_to)
+        moderator_qs: models.QuerySet[User] = get_user_model().objects.filter(
+            **cls._meta.get_field("assigned_moderator")._limit_choices_to
+        )
 
         if not moderator_qs.exists():
             raise get_user_model().DoesNotExist("Random moderator cannot be chosen, because none exist.")
