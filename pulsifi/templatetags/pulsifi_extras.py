@@ -8,6 +8,7 @@ from re import Match as RegexMatch, sub as regex_sub
 from django import template
 from django.contrib import auth
 from django.db import models
+from django.db.models.options import Options as Model_Options
 from django.template import defaultfilters, loader as template_utils
 from django.utils import html as html_utils, safestring
 
@@ -46,7 +47,7 @@ def format_mentions(value: str, autoescape=True) -> safestring.SafeString:
         except get_user_model().DoesNotExist:
             return f"@{possible_mention}"
 
-        return template_utils.render_to_string("pulsifi/mention_user_snippet.html", {"mentioned_user": mentioned_user}).strip()
+        return "".join([line.strip() for line in template_utils.render_to_string("pulsifi/mention_user_snippet.html", {"mentioned_user": mentioned_user}).splitlines()])
 
     return safestring.mark_safe(
         regex_sub(
@@ -57,25 +58,6 @@ def format_mentions(value: str, autoescape=True) -> safestring.SafeString:
     )
 
 
-@register.filter()
-def classname(value):
-    try:
-        if isinstance(value, models.Model) or issubclass(value, models.Model):
-            return value._meta.model_name
-    except TypeError:
-        pass
-    return str(type(value)).title()
-
-
-# noinspection SpellCheckingInspection
-@register.filter()
-def verbosename(value, plural=False):
-    try:
-        if isinstance(value, models.Model) or issubclass(value, models.Model):
-            if plural:
-                return value._meta.verbose_name_plural
-            else:
-                return value._meta.verbose_name
-    except TypeError:
-        pass
-    return str(type(value)).title()
+@register.simple_tag
+def model_meta(obj: models.Model) -> Model_Options:
+    return obj._meta
