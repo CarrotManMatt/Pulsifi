@@ -9,11 +9,10 @@ import re as regex
 from pathlib import Path
 
 import tldextract
+from core import utils as core_url_utils
 from django import urls as django_urls
 from django.core.exceptions import ImproperlyConfigured
 from environ import Env
-
-from core import utils as core_url_utils
 
 # Build paths inside the project like this: BASE_DIR / "subdir"
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -51,7 +50,7 @@ if env("PRODUCTION"):
         LOG_LEVEL=(str, "WARNING")
     )
 
-    _temp_log_level = prod_env("LOG_LEVEL").upper()
+    _log_level = prod_env("LOG_LEVEL").upper()
 
     # SECURITY WARNING: don't run with debug turned on in production!
     DEBUG = False
@@ -67,7 +66,7 @@ else:
         LOG_LEVEL=(str, "INFO")
     )
 
-    _temp_log_level = dev_env("LOG_LEVEL").upper()
+    _log_level = dev_env("LOG_LEVEL").upper()
 
     DEBUG = dev_env("DEBUG")
 
@@ -109,7 +108,7 @@ if not 0.1 <= env("PASSWORD_SIMILARITY_TO_USER_ATTRIBUTES") <= 1.0:
 if not 20 <= env("USERNAME_SIMILARITY_PERCENTAGE") <= 100:
     raise ImproperlyConfigured("USERNAME_SIMILARITY_PERCENTAGE must be an integer between 20 and 100.")
 _LOG_LEVEL_choices = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
-if _temp_log_level not in _LOG_LEVEL_choices:
+if _log_level not in _LOG_LEVEL_choices:
     raise ImproperlyConfigured(f"LOG_LEVEL must be one of {_LOG_LEVEL_choices}")
 
 
@@ -249,10 +248,10 @@ LOGGING = {
     "loggers": {
         "django.server": {
             "handlers": ["web_server"],
-            "level": _temp_log_level
+            "level": _log_level
         }
     },
-    "root": {"handlers": ["pulsifi"], "level": _temp_log_level}
+    "root": {"handlers": ["pulsifi"], "level": _log_level}
 }
 
 # Secret key that is used for important secret stuff (keep the one used in production a secret!)

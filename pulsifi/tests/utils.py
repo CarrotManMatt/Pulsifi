@@ -1,20 +1,24 @@
 """
     Utility classes for pulsifi app test suite.
 """
+
 import abc
+import datetime
 import json
+import random
+import string
 from typing import Iterator, Type
 
+from allauth.socialaccount.models import SocialAccount
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
-
 from pulsifi.exceptions import NotEnoughTestDataError
 from pulsifi.models import Pulse, Reply, Report, User
 
-GENERATABLE_MODELS_NAMES: set[str] = {"user", "pulse", "reply", "report"}
+PULSIFI_GENERATABLE_MODELS_NAMES: set[str] = {"user", "pulse", "reply", "report"}
 
 TEST_DATA = {}
 if settings.TEST_DATA_JSON_FILE_PATH:
@@ -65,6 +69,8 @@ def get_model_factory(model_name: str) -> Type["Base_Test_Data_Factory"]:
         return Test_Reply_Factory
     elif model_name == "report":
         return Test_Report_Factory
+    elif model_name == "social_account":
+        return Test_Social_Account_Factory
 
 
 class Base_Test_Data_Factory(abc.ABC):
@@ -95,6 +101,7 @@ class Base_Test_Data_Factory(abc.ABC):
         pass
 
     @classmethod
+    @abc.abstractmethod
     def create(cls, *, save=True, **kwargs):
         """
             Helper function that creates & returns a test object instance, with
@@ -107,11 +114,11 @@ class Base_Test_Data_Factory(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def _create_field_value(cls, field_name: str):
+    def _create_field_value(cls, field_name: str) -> str:
         raise NotImplementedError
 
     @classmethod
-    def create_field_value(cls, field_name: str):
+    def create_field_value(cls, field_name: str) -> str:
         """
             Helper function to return a new arbitrary value for the given field
             name.
@@ -444,3 +451,156 @@ class Test_Report_Factory(Base_Test_Data_Factory):
                 return next(cls.test_reasons_iterator)
             except StopIteration as e:
                 raise NotEnoughTestDataError(field_name=field_name) from e
+
+
+class Test_Social_Account_Factory(Base_Test_Data_Factory):
+    # noinspection SpellCheckingInspection
+    """
+        Helper class to provide functions that create test data for
+        :model:`socialaccount.socialaccount` object instances.
+    """
+
+    GENERATABLE_FIELDS: set[str] = {"discord_uid", "github_uid", "google_uid"}
+    AVAILABLE_PROVIDERS: set[str] = {"discord", "google", "github"}
+
+    @classmethod
+    def create(cls, *, save=True, **kwargs) -> SocialAccount:
+        # noinspection SpellCheckingInspection
+        """
+            Helper function that creates & returns a test
+            :model:`socialaccount.socialaccount` object instance, with
+            additional options for its attributes provided in kwargs. The save
+            argument declares whether the :model:`socialaccount.socialaccount`
+            instance should be saved to the database or not.
+        """
+
+        user_kwargs: dict[str, ...] = {}
+
+        field_name: str
+        for field_name in get_user_model().get_non_relation_fields(names=True) - {"id", "last_login", "date_joined"}:
+            if (field_value := kwargs.pop(f"user__{field_name}", None)) is not None:
+                user_kwargs[field_name] = field_value
+
+        if (user__is_visible := kwargs.pop("user__is_visible", None)) is not None:
+            user_kwargs["is_visible"] = user__is_visible
+
+        user: User = kwargs.pop("user", None) or Test_User_Factory.create(**user_kwargs)
+
+        try:
+            provider: str = kwargs.pop("provider")
+        except KeyError as e:
+            raise TypeError("create() missing 1 required argument: \"provider\"") from e
+
+        uid: int | None = None
+
+        extra_data: dict[str, str | int | None] = {}
+
+        if provider not in cls.AVAILABLE_PROVIDERS:
+            raise ValueError(f"Argument <provider> must be one of " + ", ".join(f"\"{available_provider}\"" for available_provider in cls.AVAILABLE_PROVIDERS))
+
+        elif provider == "discord":
+            uid: int = int(cls.create_field_value("discord_uid"))
+
+            extra_data = {
+                "id": uid,
+                "username": user.username,
+                "global_name": user.username,
+                "display_name": user.username,
+                "avatar": f"{random.randint(0, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF):032x}",
+                "discriminator": f"{random.randint(0, 9999):04}",
+                "public_flags": 0,
+                "flags": 0,
+                "banner": None,
+                "banner_color": f"#{random.randint(0x00, 0xFF):02x}{random.randint(0x00, 0xFF):02x}{random.randint(0x00, 0xFF):02x}",
+                "accent_color": random.randint(0x000000, 0xFFFFFF),
+                "locale": "en-GB",
+                "mfa_enabled": False,
+                "premium_type": 0,
+                "avatar_decoration": True,
+                "email": user.email,
+                "verified": True
+            }
+
+        elif provider == "google":
+            uid: int = int(cls.create_field_value("google_uid"))
+            google_content_link: str = f"""{random.randint(100000000000, 999999999999):012}-{"".join(random.choices(string.ascii_lowercase + string.digits, k=32))}.apps.googleusercontent.com"""
+
+            extra_data = {
+                "iss": "https://accounts.google.com",
+                "azp": google_content_link,
+                "aud": google_content_link,
+                "sub": f"{random.randint(100000000000000000000, 999999999999999999999):021}",
+                "email": user.email,
+                "email_verified": True,
+                "at_hash": "".join(random.choices(string.ascii_letters + string.digits, k=22)),
+                "name": user.username,
+                "picture": f"""https://lh3.googleusercontent.com/a/{"".join(random.choices(string.ascii_letters + string.digits, k=44))}=s96-c""",
+                "given_name": user.username[:int(len(user.username) / 2)],
+                "family_name": user.username[int(len(user.username) / 2):],
+                "locale": "en-GB",
+                "iat": random.randint(1000000000, 9999999999),
+                "exp": random.randint(1000000000, 9999999999)
+            }
+
+        elif provider == "github":
+            uid: int = int(cls.create_field_value("github_uid"))
+
+            extra_data = {
+                "login": "Pulsifi-app",
+                "id": uid,
+                "avatar_url": f"https://avatars.githubusercontent.com/u/{uid}?v=4",
+                "gravatar_id": "",
+                "url": f"https://api.github.com/users/{user.username}",
+                "html_url": f"https://github.com/{user.username}",
+                "followers_url": f"https://api.github.com/users/{user.username}/followers",
+                "following_url": f"https://api.github.com/users/{user.username}/following{{/other_user}}",
+                "gists_url": f"https://api.github.com/users/{user.username}/gists{{/gist_id}}",
+                "starred_url": f"https://api.github.com/users/{user.username}/starred{{/owner}}{{/repo}}",
+                "subscriptions_url": f"https://api.github.com/users/{user.username}/subscriptions",
+                "organizations_url": f"https://api.github.com/users/{user.username}/orgs",
+                "repos_url": f"https://api.github.com/users/{user.username}/repos",
+                "events_url": f"https://api.github.com/users/{user.username}/events{{/privacy}}",
+                "received_events_url": f"https://api.github.com/users/{user.username}/received_events",
+                "type": "User",
+                "site_admin": False,
+                "name": user.username,
+                "company": None,
+                "blog": None,
+                "location": None,
+                "email": user.email,
+                "hireable": None,
+                "bio": user.bio,
+                "twitter_username": None,
+                "public_repos": 0,
+                "public_gists": 0,
+                "followers": 0,
+                "following": 0,
+                "created_at": datetime.datetime.now().strftime("%FT%TZ"),
+                "updated_at": datetime.datetime.now().strftime("%FT%TZ")
+            }
+
+        if save:
+            return SocialAccount.objects.create(
+                user=user,
+                provider=provider,
+                uid=uid,
+                extra_data=extra_data
+            )
+        else:
+            return SocialAccount(
+                user=user,
+                provider=provider,
+                uid=uid,
+                extra_data=extra_data
+            )
+
+    @classmethod
+    def _create_field_value(cls, field_name: str) -> str:
+        if field_name == "discord_uid":
+            return f"{random.randint(10000000, 999999999999999999):018}"
+
+        elif field_name == "github_uid":
+            return f"{random.randint(100101000, 130658469):09}"
+
+        elif field_name == "google_uid":
+            return f"{random.randint(10000000, 999999999999999999999):021}"

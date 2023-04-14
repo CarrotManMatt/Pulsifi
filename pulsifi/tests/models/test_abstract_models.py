@@ -19,9 +19,8 @@ get_user_model = auth.get_user_model  # NOTE: Adding external package functions 
 class Custom_Base_Model_Tests(Base_TestCase):
     def test_refresh_from_database_updates_non_relation_fields(self):
         model_name: str
-        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+        for model_name in pulsifi_tests_utils.PULSIFI_GENERATABLE_MODELS_NAMES:
             model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
-
             obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
             old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
 
@@ -59,7 +58,7 @@ class Custom_Base_Model_Tests(Base_TestCase):
 
     def test_refresh_from_database_updates_single_relation_fields(self):
         model_name: str
-        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+        for model_name in pulsifi_tests_utils.PULSIFI_GENERATABLE_MODELS_NAMES:
             obj: pulsifi_models_utils.Custom_Base_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
             old_obj: pulsifi_models_utils.Custom_Base_Model = obj._meta.model.objects.get(id=obj.id)
 
@@ -103,7 +102,7 @@ class Custom_Base_Model_Tests(Base_TestCase):
 
     def test_update(self):
         model_name: str
-        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+        for model_name in pulsifi_tests_utils.PULSIFI_GENERATABLE_MODELS_NAMES:
             model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
             obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
 
@@ -137,7 +136,7 @@ class Custom_Base_Model_Tests(Base_TestCase):
 
     def test_update_without_commit(self):
         model_name: str
-        for model_name in pulsifi_tests_utils.GENERATABLE_MODELS_NAMES:
+        for model_name in pulsifi_tests_utils.PULSIFI_GENERATABLE_MODELS_NAMES:
             model_factory: Type[Base_Test_Data_Factory] = pulsifi_tests_utils.get_model_factory(model_name)
             obj: pulsifi_models_utils.Custom_Base_Model = model_factory.create()
 
