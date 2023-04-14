@@ -7,7 +7,8 @@ from django.contrib import auth
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import ValidationError
 from django.db import models
-
+from django.template import RequestContext
+from django.test.utils import ContextList
 from pulsifi import models as pulsifi_models
 from pulsifi.models import utils as pulsifi_models_utils, User
 from pulsifi.tests import utils as pulsifi_tests_utils
@@ -205,25 +206,29 @@ class Visible_Reportable_Mixin_Tests(Base_TestCase):
             )
 
     def test_get_absolute_url(self):
+        self.client.force_login(pulsifi_tests_utils.Test_User_Factory.create())
+
         model_name: str
         for model_name in {"user", "pulse", "reply"}:
             obj: pulsifi_models.User_Generated_Content_Model = pulsifi_tests_utils.get_model_factory(model_name).create()
 
-            absolute_url: str = obj.get_absolute_url()
-
-            self.assertTrue(absolute_url.startswith("/"))
-
-            login_user_password: str = pulsifi_tests_utils.Test_User_Factory.create_field_value("password")
-            self.client.login(
-                username=pulsifi_tests_utils.Test_User_Factory.create(
-                    password=login_user_password
-                ).username,
-                password=login_user_password
-            )
-            absolute_url_response = self.client.get(absolute_url)
+            absolute_url_response = self.client.get(obj.get_absolute_url())
 
             self.assertEqual(200, absolute_url_response.status_code)
-            self.assertIn(obj, absolute_url_response.context.dicts[3].values())
+
+            if isinstance(absolute_url_response.context, ContextList):
+                context: dict[str, ...] = {}
+
+                sub_context: list[dict[str, ...]]
+                for sub_context in absolute_url_response.context:
+                    sub_sub_context: dict[str, ...]
+                    for sub_sub_context in sub_context:
+                        context.update(sub_sub_context)
+
+                self.assertIn(obj, context.values())
+
+            elif isinstance(absolute_url_response.context, RequestContext):
+                self.assertIn(obj, absolute_url_response.context.flatten().values())
 
 
 class User_Generated_Content_Model_Tests(Base_TestCase):

@@ -39,16 +39,26 @@ def get_field_test_data(model_name: str, field_name: str) -> set[str]:
 
 
 class Base_TestCase(TestCase):
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         """
-            Hook method for setting up the test fixture before exercising it.
+            Hook method for setting up the test data more efficiently.
 
             All staff Group instances must be created before tests are run.
         """
 
+        staff_groups: dict[str, Group] = {}
+
         staff_group_name: str
         for staff_group_name in get_user_model().STAFF_GROUP_NAMES:
-            Group.objects.create(name=staff_group_name)
+            staff_groups[staff_group_name] = Group.objects.create(name=staff_group_name)
+
+        cls.staff_groups: dict[str, Group] = staff_groups
+
+    def setUp(self):
+        """
+            Hook method for setting up the test fixture before exercising it.
+        """
 
         Test_User_Factory.restart_iterators()
         Base_Test_User_Generated_Content_Factory.restart_iterators()

@@ -193,7 +193,7 @@ class User_Model_Tests(Base_TestCase):
 
     def test_user_becomes_superuser_put_in_admin_group(self):
         user = Test_User_Factory.create()
-        admin_group = Group.objects.get(name="Admins")
+        admin_group = self.staff_groups["Admins"]
 
         self.assertNotIn(admin_group, user.groups.all())
 
@@ -203,7 +203,7 @@ class User_Model_Tests(Base_TestCase):
 
     def test_superuser_has_groups_changed_kept_in_admin_group(self):
         user = Test_User_Factory.create(is_superuser=True)
-        admin_group = Group.objects.get(name="Admins")
+        admin_group = self.staff_groups["Admins"]
 
         self.assertIn(admin_group, user.groups.all())
 
@@ -225,7 +225,7 @@ class User_Model_Tests(Base_TestCase):
 
     def test_admin_group_has_users_changed_superusers_kept_in_admin_group(self):
         user = Test_User_Factory.create(is_superuser=True)
-        admin_group = Group.objects.get(name="Admins")
+        admin_group = self.staff_groups["Admins"]
 
         self.assertIn(user, admin_group.user_set.all())
 
@@ -255,28 +255,26 @@ class User_Model_Tests(Base_TestCase):
         self.assertTrue(user.is_staff)
 
     def test_user_added_to_staff_group_made_staff(self):
-        staff_group_name: str
-        for staff_group_name in get_user_model().STAFF_GROUP_NAMES:
+        staff_group: Group
+        for staff_group in self.staff_groups.values():
             user = Test_User_Factory.create()
-            group = Group.objects.get(name=staff_group_name)
 
             self.assertFalse(user.is_staff)
 
-            user.groups.add(group)
+            user.groups.add(staff_group)
 
             user.refresh_from_db()
 
             self.assertTrue(user.is_staff)
 
     def test_moderator_group_has_user_added_made_staff(self):
-        staff_group_name: str
-        for staff_group_name in get_user_model().STAFF_GROUP_NAMES:
+        staff_group: Group
+        for staff_group in self.staff_groups.values():
             user = Test_User_Factory.create()
-            group = Group.objects.get(name=staff_group_name)
 
             self.assertFalse(user.is_staff)
 
-            group.user_set.add(user)
+            staff_group.user_set.add(user)
 
             user.refresh_from_db()
 
@@ -665,7 +663,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_reported_object_is_not_only_available_assigned_moderator(self):
         moderator: User = Test_User_Factory.create()
-        moderator.groups.add(Group.objects.get(name="Moderators"))
+        moderator.groups.add(self.staff_groups["Moderators"])
 
         with self.assertRaisesMessage(ValidationError, "This reported object refers to the only moderator available to be assigned to this report. Therefore, this moderator cannot be reported."):
             Test_Report_Factory.create(
@@ -674,7 +672,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_reported_object_is_not_admin(self):
         admin: User = Test_User_Factory.create()
-        admin.groups.add(Group.objects.get(name="Admins"))
+        admin.groups.add(self.staff_groups["Admins"])
 
         with self.assertRaisesMessage(ValidationError, "This reported object refers to an admin. Admins cannot be reported."):
             Test_Report_Factory.create(
@@ -683,7 +681,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_reported_object_is_not_content_of_admin(self):
         admin: User = Test_User_Factory.create()
-        admin.groups.add(Group.objects.get(name="Admins"))
+        admin.groups.add(self.staff_groups["Admins"])
 
         model_name: str
         for model_name in {"pulse", "reply"}:
@@ -696,7 +694,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_reporter_is_not_only_available_assigned_moderator(self):
         moderator: User = Test_User_Factory.create()
-        moderator.groups.add(Group.objects.get(name="Moderators"))
+        moderator.groups.add(self.staff_groups["Moderators"])
 
         with self.assertRaisesMessage(ValidationError, "This user cannot be the reporter because they are the only moderator available to be assigned to this report."):
             Test_Report_Factory.create(reporter=moderator)
@@ -713,9 +711,8 @@ class Report_Model_Tests(Base_TestCase):
     def test_assigned_moderator_is_consistent(self):
         moderator1: User = Test_User_Factory.create()
         moderator2: User = Test_User_Factory.create()
-        moderators_group = Group.objects.get(name="Moderators")
-        moderator1.groups.add(moderators_group)
-        moderator2.groups.add(moderators_group)
+        moderator1.groups.add(self.staff_groups["Moderators"])
+        moderator2.groups.add(self.staff_groups["Moderators"])
 
         report = Test_Report_Factory.create()
 
@@ -744,7 +741,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_reported_object_is_not_content_of_only_available_assigned_moderator(self):
         moderator: User = Test_User_Factory.create()
-        moderator.groups.add(Group.objects.get(name="Moderators"))
+        moderator.groups.add(self.staff_groups["Moderators"])
 
         model_name: str
         for model_name in {"pulse", "reply"}:
@@ -783,7 +780,7 @@ class Report_Model_Tests(Base_TestCase):
 
     def test_get_moderator_qs(self):
         moderator: User = Test_User_Factory.create()
-        moderator.groups.add(Group.objects.get(name="Moderators"))
+        moderator.groups.add(self.staff_groups["Moderators"])
 
         moderator_qs = Report.get_moderator_qs()
 

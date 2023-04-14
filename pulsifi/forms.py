@@ -10,13 +10,12 @@ from django.conf import settings
 from django.contrib import auth
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-
 from pulsifi.models import Pulse, Reply
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
 
-class _Base_Form_Config(forms.Form):
+class BaseFormConfig(forms.Form):
     """
         Config class to provide the base attributes for how to configure a
         form.
@@ -39,7 +38,7 @@ class _Base_Form_Config(forms.Form):
         self.label_suffix = ""
 
 
-class Login_Form(_Base_Form_Config, Base_LoginForm):
+class Login_Form(BaseFormConfig, Base_LoginForm):
     """ Form to customise the HTML & CSS generated for the login form. """
 
     prefix = "login"
@@ -53,7 +52,7 @@ class Login_Form(_Base_Form_Config, Base_LoginForm):
         self.fields["password"].widget.attrs["placeholder"] = "Enter your Password"
 
 
-class Signup_Form(_Base_Form_Config, Base_SignupForm):
+class Signup_Form(BaseFormConfig, Base_SignupForm):
     """ Form to customise the HTML & CSS generated for the signup form. """
 
     prefix = "signup"
@@ -138,7 +137,7 @@ class Signup_Form(_Base_Form_Config, Base_SignupForm):
             logging.error(f"Validation error {repr(exception)} raised without a field name supplied.")
 
 
-class Pulse_Form(_Base_Form_Config, forms.ModelForm):
+class Pulse_Form(BaseFormConfig, forms.ModelForm):
     """ Form for creating a new Pulse """
 
     prefix = "create_pulse"
@@ -156,7 +155,7 @@ class Pulse_Form(_Base_Form_Config, forms.ModelForm):
         self.fields["message"].widget.attrs["placeholder"] = "What are you thinking...?"
 
 
-class Reply_Form(_Base_Form_Config, forms.ModelForm):
+class Reply_Form(BaseFormConfig, forms.ModelForm):
     """ Form for creating a new reply. """
 
     prefix = "create_pulse"
@@ -191,7 +190,7 @@ class Reply_Form(_Base_Form_Config, forms.ModelForm):
         return self.cleaned_data
 
 
-class Bio_Form(_Base_Form_Config, forms.ModelForm):
+class Bio_Form(BaseFormConfig, forms.ModelForm):
     """ Form for updating a user's bio. """
 
     prefix = "update_bio"
