@@ -20,11 +20,10 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinLengthValidator
 from django.db import models
 from django.utils import timezone
-from thefuzz import fuzz as thefuzz
-from tldextract.tldextract import ExtractResult as TLD_ExtractResult
-
 from pulsifi.models import utils as pulsifi_models_utils
 from pulsifi.validators import ConfusableEmailValidator, ConfusableUsernameValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedUsernameValidator
+from thefuzz import fuzz as thefuzz
+from tldextract.tldextract import ExtractResult as TLD_ExtractResult
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 abstractmethod = abc.abstractmethod
@@ -423,6 +422,14 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
 
     class Meta:
         verbose_name = "User"
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self._meta.get_field("password").error_messages = {
+            "null": "Password is a required field.",
+            "blank": "Password is a required field."
+        }
 
     def __str__(self) -> str:
         """

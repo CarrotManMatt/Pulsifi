@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import auth
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from pulsifi.models import Pulse, Reply
+from pulsifi.models import Pulse, Reply, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -62,13 +62,23 @@ class Signup_Form(BaseFormConfig, Base_SignupForm):
 
         self.fields["email"].label = "Email Address"
         self.fields["email"].widget.attrs["placeholder"] = "Enter your Email Address"
+        # noinspection PyProtectedMember
+        email_required_error_message: str = get_user_model()._meta.get_field("email").error_messages["blank"]
+        self.fields["email"].error_messages["required"] = email_required_error_message
+        self.fields["email"].default_error_messages["required"] = "This is a required field."
 
         self.fields["username"].widget.attrs["placeholder"] = "Choose a Username"
+        # noinspection PyProtectedMember
+        self.fields["username"].error_messages["required"] = get_user_model()._meta.get_field("username").error_messages["blank"]
 
         self.fields["password1"].widget.attrs["placeholder"] = "Choose a Password"
+        # noinspection PyProtectedMember
+        self.fields["password1"].error_messages["required"] = get_user_model()._meta.get_field("password").error_messages["blank"]
 
         self.fields["password2"].label = "Confirm Password"
         self.fields["password2"].widget.attrs["placeholder"] = "Re-enter your Password, to check that you can spell"
+        # noinspection PyProtectedMember
+        self.fields["password2"].error_messages["required"] = get_user_model()._meta.get_field("password").error_messages["blank"]
 
     def clean(self) -> dict[str]:
         """
@@ -78,17 +88,11 @@ class Signup_Form(BaseFormConfig, Base_SignupForm):
 
         super().clean()
 
-        empty_fields: dict[str, bool] = {
-            "username": True,
-            "password": True,
-            "email": True
-        }
-        if self.cleaned_data.get("username"):
-            empty_fields["username"] = False
-        if self.cleaned_data.get("password"):
-            empty_fields["password"] = False
-        if self.cleaned_data.get("email"):
-            empty_fields["email"] = False
+        non_empty_fields: set[str] = set()
+        field_name: str
+        for field_name in self.fields:
+            if field_name != "password2" and self.cleaned_data.get(field_name):
+                non_empty_fields.add(field_name)
 
         try:
             get_user_model()(
@@ -97,42 +101,54 @@ class Signup_Form(BaseFormConfig, Base_SignupForm):
                 email=self.cleaned_data.get("email")
             ).full_clean()
         except ValidationError as e:
-            self.add_errors_from_validation_error_exception(e, empty_fields)
+            self.add_errors_from_validation_error_exception(e, non_empty_fields)
+
+        if self.errors.get("password1") and any("common" in error for error in self.errors["password1"]) and any("short" in error for error in self.errors["password1"]):
+            self._errors["password1"] = [error for error in self._errors["password1"] if "common" not in error]
 
         return self.cleaned_data
 
-    def add_errors_from_validation_error_exception(self, exception: ValidationError, empty_fields: dict[str, bool] = None, model_field_name: str = None) -> None:
+    def add_errors_from_validation_error_exception(self, exception: ValidationError, non_empty_fields: set[str] = None, model_field_name: str = None) -> None:
         """
             Adds the error message(s) from any caught ValidationError
             exceptions to the forms errors dictionary/list.
         """
 
-        if not hasattr(exception, "error_dict") and hasattr(exception, "error_list"):
+        if non_empty_fields is None:
+            non_empty_fields = set()
+        else:
+            if "password1" in non_empty_fields:
+                non_empty_fields.remove("password1")
+                non_empty_fields.add("password")
+            non_empty_fields.discard("password2")
+
+        if not hasattr(exception, "error_dict") and hasattr(exception, "error_list") and model_field_name:
             error: ValidationError
             for error in exception.error_list:
-                if model_field_name and empty_fields:
-                    if not empty_fields[model_field_name] and "null" in error.message:
-                        self.add_error(model_field_name, error)
-                elif model_field_name:
+                if model_field_name in non_empty_fields or ("null" not in error.message and "required field" not in error.message):
                     self.add_error(model_field_name, error)
-                else:
-                    self.add_error(None, error)
+
         elif hasattr(exception, "error_dict"):
             field_name: str
             errors: list[ValidationError]
             for field_name, errors in exception.error_dict.items():
                 if field_name == "__all__":
                     self.add_error(None, errors)
-                elif field_name == "password" and empty_fields:
-                    if not empty_fields[field_name]:
-                        self.add_error("password1", [error for error in errors if "null" not in error.message])
+
                 elif field_name == "password":
-                    self.add_error("password1", errors)
-                elif empty_fields:
-                    if not empty_fields[field_name]:
-                        self.add_error(field_name, [error for error in errors if "null" not in error.message])
+                    if "password" in non_empty_fields:
+                        self.add_error("password1", errors)
+
+                    else:
+                        self.add_error("password1", [error for error in errors if self.fields["password1"].error_messages["required"] not in error.message])
+
                 else:
-                    self.add_error(field_name, errors)
+                    if field_name in non_empty_fields:
+                        self.add_error(field_name, errors)
+
+                    else:
+                        self.add_error(field_name, [error for error in errors if self.fields[field_name].error_messages["required"] not in error.message])
+
         else:
             logging.error(f"Validation error {repr(exception)} raised without a field name supplied.")
 
@@ -145,8 +161,7 @@ class Pulse_Form(BaseFormConfig, forms.ModelForm):
     # noinspection PyMissingOrEmptyDocstring
     class Meta:
         model = Pulse
-        fields = ("creator", "message")
-        widgets = {"creator": forms.HiddenInput}
+        fields = ("message",)
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -158,20 +173,21 @@ class Pulse_Form(BaseFormConfig, forms.ModelForm):
 class Reply_Form(BaseFormConfig, forms.ModelForm):
     """ Form for creating a new reply. """
 
-    prefix = "create_pulse"
+    prefix = "create_reply"
 
     # noinspection PyMissingOrEmptyDocstring
     class Meta:
         model = Reply
-        fields = ("creator", "message", "_content_type", "_object_id")  # TODO: creator should be automatically assigned (not be a selectable field)
+        fields = ("message", "_content_type", "_object_id")
         widgets = {
-            "creator": forms.HiddenInput,
             "_content_type": forms.HiddenInput,
             "_object_id": forms.HiddenInput
         }
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+
+        self.creator: User | None = None
 
         self.fields["message"].label = "Reply message..."
         self.fields["message"].widget.attrs["placeholder"] = "Reply message..."
@@ -182,10 +198,15 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
             :model:`pulsifi.reply` object.
         """
 
+        creation_time: timezone.datetime = timezone.now()
+
         super().clean()
 
-        if (timezone.now() - Reply(creator=self.cleaned_data["creator"], _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse().date_time_created) < settings.MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST:  # TODO: identify if time since last reply is too soon
-            raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.")
+        if not self.creator:
+            raise ValueError("\"creator\" property must be set on this form instance in order to clean this form.")
+
+        if (creation_time - Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse().date_time_created) < settings.MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST:
+            raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.", code="too_recent")
 
         return self.cleaned_data
 
