@@ -1,4 +1,7 @@
-""" Adapters for use in the pulsifi app. """
+"""
+    Avatar provider adapters for use in the pulsifi app.
+"""
+
 import abc
 import math
 from urllib import parse as urllib_parse_utils

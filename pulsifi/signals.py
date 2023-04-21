@@ -1,4 +1,6 @@
-""" Handles signals sent within the pulsifi app. """
+"""
+    Handles signals sent within the pulsifi app.
+"""
 
 from django import dispatch
 from django.contrib import auth

@@ -111,7 +111,7 @@ class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
         return "".join(f"{char}\u0336" for char in string)
 
 
-class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide {just likes}, {likes & {likes of replies}} or {likes, {likes of replies} & replies}) & creator follower count
+class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide [likes increase], [likes increase & dislikes decrease], [likes & [likes of replies] increase], [[likes & [likes of replies]] increase & [dislikes & [dislikes of replies]] decrease], [likes, dislikes & replies increase] or [likes, [likes of replies], dislikes, [dislikes of replies] & replies increase]) & creator follower count
     """
         Base model that defines fields for all types of user generated content,
         as well as extra instance methods for retrieving commonly computed

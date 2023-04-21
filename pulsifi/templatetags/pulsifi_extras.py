@@ -60,4 +60,10 @@ def format_mentions(value: str, autoescape=True) -> safestring.SafeString:
 
 @register.simple_tag
 def model_meta(obj: models.Model) -> Model_Options:
+    """
+        Shortcut template tag to return the meta Model_Options container for the
+        given model instance.
+    """
+
+    # noinspection PyProtectedMember
     return obj._meta

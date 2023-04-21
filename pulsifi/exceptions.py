@@ -1,4 +1,6 @@
-""" Custom exceptions for use within the pulsifi app. """
+"""
+    Custom exceptions for use within the pulsifi app.
+"""
 
 from typing import Collection
 

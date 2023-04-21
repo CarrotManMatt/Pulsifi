@@ -12,7 +12,11 @@ urlpatterns: list[django_urls.URLPattern] = [
     django_urls.path("", views.Home_View.as_view(), name="home"),
     django_urls.path("feed/", views.Feed_View.as_view(), name="feed"),
     # TODO: user search url, leaderboard url
-    django_urls.path("user/", views.Self_Account_View.as_view(), name="self_account"),
+    django_urls.path(
+        "user/",
+        views.Self_Account_View.as_view(),
+        name="self_account"
+    ),
     django_urls.path(
         "user/@<str:username>/",
         views.Specific_Account_View.as_view(),

@@ -1,6 +1,7 @@
 """
     Automated test suite for abstract models in pulsifi app.
 """
+
 from typing import Type
 
 from django.contrib import auth
