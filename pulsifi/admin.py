@@ -11,7 +11,6 @@ from django.db import models
 from django.forms import BaseModelForm
 from django.http import HttpRequest
 from rangefilter.filters import DateTimeRangeFilter
-
 from .admin_filters import AssignedModeratorListFilter, CategoryListFilter, CreatedPulsesListFilter, CreatedRepliesListFilter, DirectRepliesListFilter, DislikesListFilter, GroupListFilter, HasReportAboutObjectListFilter, LikesListFilter, RepliedObjectTypeListFilter, ReportedObjectTypeListFilter, StaffListFilter, StatusListFilter, UserContentVisibleListFilter, UserVerifiedListFilter, UserVisibleListFilter
 from .admin_inlines import About_Object_Report_Inline, Avatar_Inline, Created_Pulse_Inline, Created_Reply_Inline, Direct_Reply_Inline, Disliked_Pulse_Inline, Disliked_Reply_Inline, EmailAddress_Inline, Liked_Pulse_Inline, Liked_Reply_Inline, Moderator_Assigned_Report_Inline, Submitted_Report_Inline, _Base_Report_Inline_Config
 from .models import Follow, Pulse, Reply, Report, User
@@ -83,7 +82,12 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
         "is_visible"
     )
     actions = None
-    search_fields = ("creator__username", "message", "liked_by__username", "disliked_by__username")
+    search_fields = (
+        "creator__username",
+        "message",
+        "liked_by__username",
+        "disliked_by__username"
+    )
     autocomplete_fields = ("creator", "liked_by", "disliked_by")
     search_help_text = "Search for a creator, message content or liked/disliked by user"
     list_editable = ("is_visible",)
@@ -156,16 +160,16 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
             readonly_fields, only if they don't already exist.
         """
 
-        readonly_fields: set[str] = set(super().get_readonly_fields(request, obj))
+        readonly_fields: dict[str, None] = dict.fromkeys(super().get_readonly_fields(request, obj))
 
         readonly_fields.update(
-            (
+            {key: None for key in (
                 "display_likes",
                 "display_dislikes",
                 "display_direct_replies_count",
                 "display_full_depth_replies_count",
                 "id"
-            )
+            )}
         )
 
         return tuple(readonly_fields)
@@ -194,15 +198,15 @@ class _User_Content_Admin(_Display_Date_Time_Created_Admin):
             only if they don't already exist.
         """
 
-        inlines: set[Type[admin.options.InlineModelAdmin]] = set(super().get_inlines(request, obj))
+        inlines: dict[Type[admin.options.InlineModelAdmin], None] = dict.fromkeys(super().get_inlines(request, obj))
 
         try:
             Report._meta.get_field("assigned_moderator").default()
 
         except get_user_model().DoesNotExist:
-            return tuple([inline for inline in inlines if not issubclass(inline, _Base_Report_Inline_Config)])
-        else:
-            return tuple(inlines)
+            inlines = {inline: None for inline in inlines if not issubclass(inline, _Base_Report_Inline_Config)}
+
+        return tuple(inlines)
 
     def get_form(self, *args, **kwargs) -> Type[BaseModelForm]:
         """
@@ -243,10 +247,10 @@ class Pulse_Admin(_User_Content_Admin):
             "classes": ("collapse",)
         }),
         ("Replies", {
-            "fields": (
-                ("display_direct_replies_count",
-                "display_full_depth_replies_count")
-            )
+            "fields": ((
+                "display_direct_replies_count",
+                "display_full_depth_replies_count"
+            ))
         }),
         (None, {
             "fields": ("is_visible", "display_date_time_created")
@@ -458,13 +462,13 @@ class Reply_Admin(_User_Content_Admin):
             readonly_fields, only if they don't already exist.
         """
 
-        readonly_fields: set[str] = set(super().get_readonly_fields(request, obj))
+        readonly_fields: dict[str, None] = dict.fromkeys(super().get_readonly_fields(request, obj))
 
         readonly_fields.update(
-            (
+            {key: None for key in (
                 "display_original_pulse",
                 "display_replied_content"
-            )
+            )}
         )
 
         return tuple(readonly_fields)
@@ -850,15 +854,16 @@ class User_Admin(BaseUserAdmin):
             only if they don't already exist.
         """
 
-        inlines: set[Type[admin.options.InlineModelAdmin]] = set(super().get_inlines(request, obj))
+        inlines: dict[Type[admin.options.InlineModelAdmin], None] = dict.fromkeys(super().get_inlines(request, obj))
 
         if obj is None:
-            inlines.discard(EmailAddress_Inline)
+            inlines.pop(EmailAddress_Inline, None)
 
         try:
             Report._meta.get_field("assigned_moderator").default()
+
         except get_user_model().DoesNotExist:
-            inlines = {inline for inline in inlines if not issubclass(inline, _Base_Report_Inline_Config)}
+            inlines = {inline: None for inline in inlines if not issubclass(inline, _Base_Report_Inline_Config)}
 
         return tuple(inlines)
 

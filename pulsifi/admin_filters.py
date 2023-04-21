@@ -2,6 +2,7 @@
     Admin filters for models in pulsifi app.
 """
 
+import abc
 from typing import Container, Sequence
 
 from django.contrib import admin, auth
@@ -9,11 +10,34 @@ from django.contrib.auth.models import Group
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.http import HttpRequest
+from pulsifi.models import Pulse, Reply, Report, User, Visible_Reportable_Mixin
 from rangefilter.filters import NumericRangeFilter
 
-from pulsifi.models import Pulse, Reply, Report, User
-
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
+
+
+class Base_VisibleListFilter(admin.SimpleListFilter, abc.ABC):
+    """
+        Admin filter to limit any Visible_Reportable_Mixin objects shown on the
+        admin list view, by the object's visibility.
+    """
+
+    title = "Visibility"
+    parameter_name = "is_visible"
+
+    def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin) -> Sequence[tuple[str, str]]:
+        """
+            Returns the sequence of pairs of url filter names & verbose filter
+            names of the possible lookups.
+        """
+
+        return ("1", "Visible"), ("0", "Not Visible")
+
+    @abc.abstractmethod
+    def queryset(self, request: HttpRequest, queryset: models.QuerySet[Visible_Reportable_Mixin]) -> models.QuerySet[Visible_Reportable_Mixin]:
+        """ Returns the filtered queryset according to the given url lookup. """
+
+        raise NotImplementedError
 
 
 class UserVerifiedListFilter(admin.SimpleListFilter):
@@ -23,7 +47,7 @@ class UserVerifiedListFilter(admin.SimpleListFilter):
     """
 
     title = "Verified"
-    parameter_name = "verified"
+    parameter_name = "is_verified"
 
     def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin) -> Sequence[tuple[str, str]]:
         """
@@ -31,33 +55,22 @@ class UserVerifiedListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return ("1", "Is Verified"), ("0", "Is Not Verified")
+        return ("1", "Verified"), ("0", "Not Verified")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> models.QuerySet[User]:
         """ Returns the filtered queryset according to the given url lookup. """
 
         if self.value() == "1":
-            return queryset.filter(verified=True)
+            return queryset.filter(is_verified=True)
         if self.value() == "0":
-            return queryset.filter(verified=False)
+            return queryset.filter(is_verified=False)
 
 
-class UserVisibleListFilter(admin.SimpleListFilter):
+class UserVisibleListFilter(Base_VisibleListFilter):
     """
         Admin filter to limit the :model:`pulsifi.user` objects shown on the
         admin list view, by the user's visibility.
     """
-
-    title = "Visibility"
-    parameter_name = "visible"
-
-    def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin) -> Sequence[tuple[str, str]]:
-        """
-            Returns the sequence of pairs of url filter names & verbose filter
-            names of the possible lookups.
-        """
-
-        return ("1", "Visible"), ("0", "Not Visible")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> models.QuerySet[User]:
         """ Returns the filtered queryset according to the given url lookup. """
@@ -109,7 +122,7 @@ class StaffListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return ("1", "Is Staff Member"), ("0", "Is Not Staff Member")
+        return ("1", "Staff Member"), ("0", "Not a Staff Member")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> models.QuerySet[User]:
         """ Returns the filtered queryset according to the given url lookup. """
@@ -335,23 +348,12 @@ class HasReportAboutObjectListFilter(admin.SimpleListFilter):
             return queryset.filter(_reports=0)
 
 
-class UserContentVisibleListFilter(admin.SimpleListFilter):
+class UserContentVisibleListFilter(Base_VisibleListFilter):
     """
         Admin filter to limit the :model:`pulsifi.pulse`,
         :model:`pulsifi.reply` objects shown on the admin list view, by whether
         they are visible or not.
     """
-
-    title = "Visibility"
-    parameter_name = "visible"
-
-    def lookups(self, request: HttpRequest, model_admin: admin.ModelAdmin) -> Sequence[tuple[str, str]]:
-        """
-            Returns the sequence of pairs of url filter names & verbose filter
-            names of the possible lookups.
-        """
-
-        return ("1", "Visible"), ("0", "Not Visible")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[Pulse | Reply]) -> models.QuerySet[Pulse | Reply]:
         """ Returns the filtered queryset according to the given url lookup. """

@@ -10,7 +10,6 @@ from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
 from django.http import HttpRequest
-
 from pulsifi.models import Pulse, Reply, Report
 
 
@@ -322,7 +321,7 @@ class Created_Pulse_Inline(_Base_Pulse_Inline_Config, _Created_User_Content_Inli
     verbose_name = "Created Pulse"
     fieldsets = [
         (None, {
-            "fields": ["message", ("visible", "display_date_time_created")]
+            "fields": ["message", ("is_visible", "display_date_time_created")]
         }),
         ("Likes & Dislikes", {
             "fields": [("liked_by", "display_likes"), ("disliked_by", "display_dislikes")]
@@ -387,7 +386,7 @@ class Created_Reply_Inline(_Base_Reply_Inline_Config, _Created_User_Content_Inli
     verbose_name_plural = "Created Replies"
     fieldsets = [
         (None, {
-            "fields": ["message", ("visible", "display_date_time_created")]
+            "fields": ["message", ("is_visible", "display_date_time_created")]
         }),
         ("Replied Content", {
             "fields": [("_content_type", "_object_id"), "display_original_pulse"]
@@ -509,7 +508,7 @@ class Direct_Reply_Inline(_Base_Reply_Inline_Config, _Base_User_Content_Inline_C
         "display_direct_replies_count",
         "display_full_depth_replies_count",
         "display_original_pulse",
-        "visible"
+        "is_visible"
     ]
     autocomplete_fields = ["liked_by", "disliked_by"]
 
