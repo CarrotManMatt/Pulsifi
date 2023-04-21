@@ -205,8 +205,13 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
         if not self.creator:
             raise ValueError("\"creator\" property must be set on this form instance in order to clean this form.")
 
-        if (creation_time - Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse().date_time_created) < settings.MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST:
-            raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.", code="too_recent")
+        try:
+            latest_reply_of_same_original_pulse: Reply = Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type_id=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse()
+        except Reply.DoesNotExist:
+            pass
+        else:
+            if (creation_time - latest_reply_of_same_original_pulse.date_time_created) < settings.MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST:
+                raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.", code="too_recent")
 
         return self.cleaned_data
 

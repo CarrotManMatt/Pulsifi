@@ -1,6 +1,7 @@
 {% load avatar_tags %}
 {% load pulsifi_extras %}
 {% model_meta content as content_meta %}
+{% model_content_type content as content_content_type %}
 <div class="container-fluid p-5 text-center">
     <div class="card flex-x5-nowrap">
         <div class="tab-content admin-tab-content pt30">
@@ -26,23 +27,33 @@
                             <span class="text-small">{{ content.liked_by.count }} Likes</span>
                             <form style="display:inline;" method="post">  {# like action in backgroud with ajax to prevent page refresh #}
                                 {% csrf_token %}
-                                <input type="submit" class="btn btn-sm btn-success" {% if request.user in content.liked_by.all %}disabled{% endif %} value="Like">
-                                <input type="hidden" name="action" value="like">
+                                {% if request.user in content.liked_by.all %}
+                                    <input type="submit" class="btn btn-sm btn-success" value="✕ Remove Like ✕">
+                                    <input type="hidden" name="action" value="remove_like">
+                                {% else %}
+                                    <input type="submit" class="btn btn-sm btn-success" value="Like">
+                                    <input type="hidden" name="action" value="like">
+                                {% endif %}
                                 <input type="hidden" name="likeable_object_id" value="{{ content.id }}">
                                 <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
                             </form>
                             <button type="button" class="btn btn-sm btn-secondary"
-                                    onclick="addModalData('reply-create-modal', '{{ content_meta.model_name }}', '{{ content.id }}');openModal('reply-create-modal')">Reply to this
-                                Reply
+                                    onclick="addModalData('reply-create-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('reply-create-modal')">Reply to this
+                                {{ content_meta.verbose_name }}
                             </button>
                             <button type="button" class="btn btn-sm btn-info"
-                                    onclick="addModalData('report-create-modal', '{{ content_meta.model_name }}', '{{ content.id }}');openModal('report-create-modal')">Report This
-                                Reply
+                                    onclick="addModalData('report-create-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('report-create-modal')">Report This
+                                {{ content_meta.verbose_name }}
                             </button>
                             <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}
                                 {% csrf_token %}
-                                <input type="submit" class="btn btn-sm btn-danger" {% if request.user in content.disliked_by.all %}disabled{% endif %} value="Dislike">
-                                <input type="hidden" name="action" value="dislike">
+                                {% if request.user in content.disliked_by.all %}
+                                    <input type="submit" class="btn btn-sm btn-danger" value="✕ Remove Dislike ✕">
+                                    <input type="hidden" name="action" value="remove_dislike">
+                                {% else %}
+                                    <input type="submit" class="btn btn-sm btn-danger" value="Dislike">
+                                    <input type="hidden" name="action" value="dislike">
+                                {% endif %}
                                 <input type="hidden" name="dislikeable_object_id" value="{{ content.id }}">
                                 <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
                             </form>

@@ -12,13 +12,10 @@ function closeModal(modal_id) {
     document.getElementById(modal_id).classList.remove("show")
 }
 
-function addModalData(modal_id, _content_type, _object_id) {
-    const form = document.getElementById(modal_id).querySelector(`#${modal_id} form`)  // TODO: Make form fields in forms.py
-    console.log(form)
+function addModalData(modal_id, _content_type_id, _object_id) {
+    const form = document.getElementById(modal_id).querySelector(`#${modal_id} form`)
 
-    // form.querySelector("#creator_id_input").value = creator_id
+    form.querySelector('[id*="_content_type"]').value = _content_type_id
 
-    form.querySelector("#content_type_input").value = _content_type
-
-    form.querySelector("#object_id_input").value = _object_id
+    form.querySelector('[id*="_object_id"]').value = _object_id
 }

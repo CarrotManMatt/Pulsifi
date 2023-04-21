@@ -7,6 +7,7 @@ from re import Match as RegexMatch, sub as regex_sub
 
 from django import template
 from django.contrib import auth
+from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.db.models.options import Options as Model_Options
 from django.template import defaultfilters, loader as template_utils
@@ -59,11 +60,27 @@ def format_mentions(value: str, autoescape=True) -> safestring.SafeString:
 
 
 @register.simple_tag
-def model_meta(obj: models.Model) -> Model_Options:
+def model_meta(obj: models.Model) -> bool | Model_Options:
     """
         Shortcut template tag to return the meta Model_Options container for the
         given model instance.
     """
 
+    if not obj:
+        return False
+
     # noinspection PyProtectedMember
     return obj._meta
+
+
+@register.simple_tag
+def model_content_type(obj: models.Model) -> bool | ContentType:
+    """
+        Shortcut template tag to return the corresponding ContentType instance
+        for the given model instance.
+    """
+
+    if not obj:
+        return False
+
+    return ContentType.objects.get_for_model(obj)
