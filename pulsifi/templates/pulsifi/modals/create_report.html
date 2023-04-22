@@ -1,0 +1,33 @@
+{% extends "pulsifi/modals/base.html" %}
+
+{% block modal_id %}create-report-modal{% endblock %}
+{% block modal_close_id %}close-create-report-modal{% endblock %}
+{% block close_modal_function_id %}create-report-modal{% endblock %}
+
+{% block modal_title %}New Report{% endblock %}
+
+{% block modal_body %}
+    <div class="form-group"> {# Move to form html template #}
+        <input type="hidden" id="create_report-_content_type" name="_content_type">
+        <input type="hidden" id="create_report-_object_id" name="_object_id">
+        <label for="reason">Report reason...</label>
+        <input type="text" required class="form-control" name="reason" id="reason" placeholder="Report reason...">
+        <label for="category">Category</label>
+        <select name="category" class="m-2" required id="category">
+            <option value="" selected="">---------</option>
+            <option value="SPM">Spam</option>
+            <option value="SEX">Nudity or sexual activity</option>
+            <option value="HAT">Hate speech or symbols</option>
+            <option value="VIO">Violence or dangerous organisations</option>
+            <option value="IGL">Sale of illegal or regulated goods</option>
+            <option value="BUL">Bullying or harassment</option>
+            <option value="INP">Intellectual property violation or impersonation</option>
+            <option value="INJ">Suicide or self-injury</option>
+            <option value="SCM">Scam or fraud</option>
+            <option value="FLS">False or misleading information</option>
+        </select>
+    </div>
+{% endblock %}
+
+{% block submit_button_id %}create-report-submit{% endblock %}
+{% block submit_button_content %}Submit Report{% endblock %}

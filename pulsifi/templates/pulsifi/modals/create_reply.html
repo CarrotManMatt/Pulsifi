@@ -1,0 +1,15 @@
+{% extends "pulsifi/modals/base.html" %}
+
+{% block modal_id %}create-reply-modal{% endblock %}
+{% block modal_close_id %}close-create-reply-modal{% endblock %}
+{% block close_modal_function_id %}create-reply-modal{% endblock %}
+
+{% block modal_title %}New Reply{% endblock %}
+
+{% block modal_body %}
+    <input type="hidden" name="action" id="action" value="reply">
+    {{ reply_form }}
+{% endblock %}
+
+{% block submit_button_id %}create-reply-submit{% endblock %}
+{% block submit_button_content %}Reply to this Content{% endblock %}

@@ -38,11 +38,11 @@
                                 <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
                             </form>
                             <button type="button" class="btn btn-sm btn-secondary"
-                                    onclick="addModalData('reply-create-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('reply-create-modal')">Reply to this
+                                    onclick="addModalData('create-reply-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-reply-modal')">Reply to this
                                 {{ content_meta.verbose_name }}
                             </button>
                             <button type="button" class="btn btn-sm btn-info"
-                                    onclick="addModalData('report-create-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('report-create-modal')">Report This
+                                    onclick="addModalData('create-report-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-report-modal')">Report This
                                 {{ content_meta.verbose_name }}
                             </button>
                             <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}

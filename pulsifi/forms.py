@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib import auth
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
 from pulsifi.models import Pulse, Reply, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
@@ -206,7 +207,7 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
             raise ValueError("\"creator\" property must be set on this form instance in order to clean this form.")
 
         try:
-            latest_reply_of_same_original_pulse: Reply = Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type_id=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse()
+            latest_reply_of_same_original_pulse: Reply = Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse()
         except Reply.DoesNotExist:
             pass
         else:
