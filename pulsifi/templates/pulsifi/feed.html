@@ -1,6 +1,8 @@
 {% extends "pulsifi/base.html" %}
 {% load static %}
 
+{% block title %}Feed{% endblock %}
+
 {% block content %}
     <div class="container py-5">
         <div class="mx-auto">
@@ -78,5 +80,5 @@
 {% endblock %}
 
 {% block scripts %}
-    <script src="{% static 'pulsifi/scripts/modal_controller.js' %}"></script>
+    <script src="{% static 'pulsifi/js_snippets/modal_controller.js' %}"></script>
 {% endblock %}
