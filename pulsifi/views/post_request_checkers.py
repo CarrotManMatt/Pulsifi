@@ -1,4 +1,3 @@
-import logging
 from typing import Protocol, Type
 
 from django import shortcuts as django_shortcuts
@@ -8,7 +7,7 @@ from django.db import IntegrityError
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.template.response import TemplateResponse
 
-from pulsifi.forms import Reply_Form
+from pulsifi.forms import Pulse_Form, Reply_Form
 from pulsifi.models import Pulse, Reply, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
@@ -132,27 +131,41 @@ def check_add_or_remove_like_or_dislike_in_post_request(view: Template_View_Mixi
                     return django_shortcuts.redirect(view.request.path_info)
 
 
-def check_reply_in_post_request(view: Template_View_Mixin_Protocol) -> bool | HttpResponse:
+def check_create_pulse_or_reply_in_post_request(view: Template_View_Mixin_Protocol) -> bool | HttpResponse:
+    # noinspection PyShadowingNames
+    def validate(form: Pulse_Form | Reply_Form) -> bool | HttpResponse:
+        if form.is_valid():
+            content: Pulse | Reply = form.save(commit=False)
+            content.creator = view.request.user
+            content.save()
+
+            return django_shortcuts.redirect(content)
+
+        else:
+            if isinstance(form, Pulse_Form):
+                return view.render_to_response(
+                    view.get_context_data(create_pulse_form=form)
+                )
+
+            elif isinstance(form, Reply_Form):
+                return view.render_to_response(
+                    view.get_context_data(create_reply_form=form)
+                )
+
     try:
         action: str = view.request.POST["action"].lower()
     except KeyError:
-        logging.debug("here")
         return False
 
     else:
-        if action != "reply":
+        if action not in {"create_pulse", "create_reply"}:
             return False
 
-        reply_form = Reply_Form(view.request.POST, prefix="create_reply")
-        reply_form.creator = view.request.user
-        if reply_form.is_valid():
-            reply: Reply = reply_form.save(commit=False)
-            reply.creator = reply_form.creator
-            reply.save()
+        if action == "create_pulse":
+            form = Pulse_Form(view.request.POST, prefix="create_pulse")
+            form.creator = view.request.user
+            return validate(form)
 
-            return django_shortcuts.redirect(reply)
-
-        else:
-            return view.render_to_response(
-                view.get_context_data(reply_form=reply_form)
-            )
+        elif action == "create_reply":
+            form = Reply_Form(view.request.POST, prefix="create_reply")
+            return validate(form)

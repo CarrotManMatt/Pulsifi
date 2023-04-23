@@ -6,10 +6,8 @@
 {% block close_modal_function_id %}create-pulse-modal{% endblock %}
 
 {% block modal_body %}
-    <div class="form-group"> {# Move to form html template #}
-        <label for="new-post-content">What do you want to share today?</label>
-        <input type="text" required class="form-control" id="new-post-content" name="message" placeholder="What are you thinking...?">
-    </div>
+    <input type="hidden" name="action" id="action" value="create_pulse">
+    {{ create_pulse_form }}
 {% endblock %}
 
 {% block submit_button_id %}create-pulse-submit{% endblock %}

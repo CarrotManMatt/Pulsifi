@@ -167,7 +167,7 @@ class Pulse_Form(BaseFormConfig, forms.ModelForm):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
-        self.fields["message"].label = "What are you thinking...?"
+        self.fields["message"].label = "What do you want to share today?"
         self.fields["message"].widget.attrs["placeholder"] = "What are you thinking...?"
 
 

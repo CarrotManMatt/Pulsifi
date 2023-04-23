@@ -1,4 +1,3 @@
-import logging
 from typing import Callable
 
 from allauth.account import utils as allauth_utils
@@ -8,7 +7,8 @@ from django.db import models
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.generic.base import ContextMixin
 from el_pagination.views import MultipleObjectMixin
-from pulsifi.forms import Reply_Form
+
+from pulsifi.forms import Pulse_Form, Reply_Form
 from pulsifi.models import Pulse
 from pulsifi.views import post_request_checkers
 from pulsifi.views.post_request_checkers import Template_View_Mixin_Protocol
@@ -25,7 +25,6 @@ class PostRequestCheckerMixin(Template_View_Mixin_Protocol):
         else:
             post_request_checker_function: Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]
             for post_request_checker_function in self.get_post_request_checker_functions():
-                logging.debug(post_request_checker_function.__name__)
                 if response := post_request_checker_function(self):
                     return response
 
@@ -51,8 +50,10 @@ class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin)
             }
         )
 
-        if "reply_form" not in context:
-            context["reply_form"] = Reply_Form(prefix="create_reply")
+        if "create_pulse_form" not in context:
+            context["create_pulse_form"] = Pulse_Form(prefix="create_pulse")
+        if "create_reply_form" not in context:
+            context["create_reply_form"] = Reply_Form(prefix="create_reply")
 
         return context
 
@@ -60,7 +61,7 @@ class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin)
     def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
         return super().get_post_request_checker_functions() | {
             post_request_checkers.check_add_or_remove_like_or_dislike_in_post_request,
-            post_request_checkers.check_reply_in_post_request
+            post_request_checkers.check_create_pulse_or_reply_in_post_request
         }
 
 

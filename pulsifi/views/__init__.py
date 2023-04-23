@@ -1,0 +1,223 @@
+"""
+    Views in pulsifi app.
+"""
+
+import logging
+from typing import Callable
+
+from allauth.account.views import LoginView as Base_LoginView, SignupView as Base_SignupView
+from django import shortcuts as django_shortcuts, urls as django_urls
+from django.conf import settings
+from django.contrib import auth
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import models
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.views.generic import ListView, RedirectView
+from django.views.generic.base import TemplateView
+from el_pagination.views import AjaxListView
+
+from pulsifi.exceptions import GETParameterError
+from pulsifi.forms import Login_Form, Signup_Form
+from pulsifi.models import Pulse, User
+from . import post_request_checkers
+from .mixins import PostRequestCheckerMixin, PulseListMixin, RedirectAuthenticatedUserMixin
+from .post_request_checkers import Template_View_Mixin_Protocol
+
+get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
+
+
+class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast for account deletion, ask to log in when redirecting here (show modal), prevent users with >3 in progress reports or >0 completed reports from logging in (with reason page)
+    template_name = "pulsifi/home.html"
+    http_method_names = ["get"]
+
+    def get_context_data(self, **kwargs) -> dict[str, ...]:
+        context = super().get_context_data(**kwargs)
+
+        if "login_form" not in kwargs and "login_form" not in self.request.session:
+            context["login_form"] = Login_Form(prefix="login")
+
+        elif "login_form" in kwargs:
+            context["login_form"] = kwargs["login_form"]
+
+        elif "login_form" in self.request.session:
+            login_form = Login_Form(
+                data=self.request.session["login_form"]["data"],
+                request=self.request,
+                prefix="login"
+            )
+            login_form.is_valid()
+
+            context["login_form"] = login_form
+
+            del self.request.session["login_form"]
+
+        if "signup_form" not in kwargs and "signup_form" not in self.request.session:
+            context["signup_form"] = Signup_Form(prefix="signup")
+
+        elif "signup_form" in kwargs:
+            context["signup_form"] = kwargs["signup_form"]
+
+        elif "signup_form" in self.request.session:
+            signup_form = Signup_Form(
+                data=self.request.session["signup_form"]["data"],
+                prefix="signup"
+            )
+            signup_form.is_valid()
+
+            context["signup_form"] = signup_form
+
+            del self.request.session["signup_form"]
+
+        # noinspection PyArgumentList
+        if self.request.GET.get(key="action") in ("login", "signup"):
+            try:
+                context["redirect_field_value"] = self.request.GET[self.redirect_field_name]
+            except KeyError:
+                logging.error(
+                    f"redirect_field_value could not be added to template context because the value was not found in the GET parameter with key: \"{self.redirect_field_name}\""
+                )
+
+        context["redirect_field_name"] = self.redirect_field_name
+
+        return context
+
+
+class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: POST actions for pulses & replies, only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, show replies, toast for successful redirect after login, highlight pulse/reply (from get parameters) at top of page or message if not visible
+    template_name = "pulsifi/feed.html"
+
+    def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
+        try:
+            return super().get(request, *args, **kwargs)
+        except GETParameterError:
+            return HttpResponseBadRequest()
+
+    def get_queryset(self) -> models.QuerySet[Pulse]:
+        user: User = self.request.user
+        queryset: models.QuerySet[Pulse] = user.get_feed_pulses()
+
+        if self.request.method == "GET" and "highlight" in self.request.GET:
+            # noinspection PyTypeChecker
+            highlight: str = self.request.GET["highlight"]
+
+            try:
+                return queryset.exclude(id=int(highlight))
+            except ValueError as e:
+                raise GETParameterError(get_parameters={"highlight": highlight}) from e
+
+        return queryset
+
+
+class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast for users that have just signed up to edit their bio/avatar
+    query_string = True
+
+    def get_redirect_url(self, *args, **kwargs) -> str:
+        return django_urls.reverse(
+            "pulsifi:specific_account",
+            kwargs={"username": self.request.user.username}
+        )
+
+
+class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: POST actions for pulses & replies, only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, change profile parts (if self profile), delete account with modal or view all finished pulses (if self profile), show replies, toast for account creation, prevent create new pulses/replies if >3 in progress or >1 completed reports on user or pulse/reply of user
+    template_name = "pulsifi/account.html"
+
+    def get_context_data(self, **kwargs) -> dict[str, ...]:
+        context = super().get_context_data(**kwargs)
+
+        context["specific_account"] = django_shortcuts.get_object_or_404(
+            get_user_model(),
+            is_active=True,
+            username=self.kwargs.get("username")
+        )
+
+        return context
+
+    def get_queryset(self) -> models.QuerySet[Pulse]:
+        return django_shortcuts.get_object_or_404(
+            get_user_model(),
+            is_active=True,
+            username=self.kwargs.get("username")
+        ).created_pulse_set.all()
+
+    @classmethod
+    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
+        return super().get_post_request_checker_functions() | {
+            post_request_checkers.check_follow_or_unfollow_in_post_request
+        }
+
+
+class Following_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # TODO: Inherit from combined following/followers view
+    template_name = "pulsifi/related_users.html"
+    context_object_name = "related_user_list"
+    extra_context = {"follow_form": True}
+    object_list = None  # HACK: set object_list to None to prevent not set error
+
+    def get_queryset(self) -> models.QuerySet[User]:
+        return get_user_model().objects.annotate(models.Count("followers")).filter(
+            followers=self.request.user
+        ).order_by("-followers__count")
+
+    @classmethod
+    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
+        return super().get_post_request_checker_functions() | {
+            post_request_checkers.check_follow_or_unfollow_in_post_request
+        }
+
+
+class Followers_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # TODO: Inherit from combined following/followers view
+    template_name = "pulsifi/related_users.html"
+    context_object_name = "related_user_list"
+    object_list = None  # HACK: set object_list to None to prevent not set error
+
+    def get_queryset(self) -> models.QuerySet[User]:
+        return get_user_model().objects.annotate(models.Count("followers")).filter(
+            following=self.request.user
+        ).order_by("-followers__count")
+
+    @classmethod
+    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
+        return super().get_post_request_checker_functions() | {
+            post_request_checkers.check_follow_or_unfollow_in_post_request
+        }
+
+
+# TODO: profile search view, leaderboard view, report views
+
+
+class Signup_POST_View(Base_SignupView):
+    http_method_names = ["post"]
+    redirect_authenticated_user = True
+    prefix = "signup"
+
+    def form_invalid(self, form) -> HttpResponseRedirect:  # BUG: errors don't show & login popup comes up, not signup popup (get parameters are changed)
+        if "signup_form" in self.request.session:
+            del self.request.session["signup_form"]
+
+        self.request.session["signup_form"] = {
+            "data": form.data,
+            "errors": form.errors
+        }
+
+        return django_shortcuts.redirect(settings.SIGNUP_URL)
+
+
+class Login_POST_View(Base_LoginView):
+    http_method_names = ["post"]
+    redirect_authenticated_user = True
+    prefix = "login"
+
+    def form_invalid(self, form) -> HttpResponseRedirect:
+        if "login_form" in self.request.session:
+            del self.request.session["login_form"]
+
+        self.request.session["login_form"] = {
+            "data": form.data,
+            "errors": form.errors
+        }
+
+        return django_shortcuts.redirect(settings.LOGIN_URL)
+
+# TODO: password change view, confirm email view, manage emails view, password set after not having one because of social login view, forgotten password reset view, forgotten password reset success view, logout confirmation popup (toast)
+
+# TODO: 2fa stuff!
+
+# TODO: 404 error page, 403 forbidden page when reports cannot be created, other nicer error pages (look up all possible http errors)
