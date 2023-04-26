@@ -2,42 +2,7 @@
     Custom exceptions for use within the pulsifi app.
 """
 
-from typing import Collection
-
-from django.db.models import Field
 from django.http import HttpRequest
-
-
-class UpdateFieldNamesError(ValueError):
-    """
-        Provided field names do not match any of the fields within the given
-        model.
-    """
-
-    DEFAULT_MESSAGE = "Model's fields does not contain any of the requested update field names."  # TODO: Better default message
-
-    def __init__(self, message: str = None, model_fields: Collection[Field] = None, update_field_names: Collection[str] = None) -> None:
-        self.message: str = message or self.DEFAULT_MESSAGE
-
-        if model_fields is None:
-            self.model_fields = set()
-        else:
-            self.model_fields = set(model_fields)
-
-        if update_field_names is None:
-            self.update_field_names = set()
-        else:
-            self.update_field_names = set(update_field_names)
-
-        super().__init__(message or self.DEFAULT_MESSAGE)
-
-    def __str__(self) -> str:
-        """
-            Returns formatted message & properties of the
-            UpdateFieldNamesError.
-        """
-
-        return f"{self.message} (model_fields={repr(self.model_fields)}, update_field_names={repr(self.update_field_names)})"
 
 
 class HttpResponseBadRequestError(Exception):

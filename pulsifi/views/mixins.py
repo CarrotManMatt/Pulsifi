@@ -37,7 +37,7 @@ class PostRequestCheckerMixin(Template_View_Mixin_Protocol):
 
 
 class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin):
-    object_list: models.QuerySet[Pulse]  # HACK: set object_list to None to prevent not set error
+    object_list: models.QuerySet[Pulse]
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
         context = super().get_context_data(**kwargs)

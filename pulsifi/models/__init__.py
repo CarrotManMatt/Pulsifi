@@ -17,13 +17,14 @@ from django.contrib.auth.models import AbstractUser, Group
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator, MinLengthValidator
+from django.core.validators import MinLengthValidator, RegexValidator
 from django.db import models
 from django.utils import timezone
-from pulsifi.models import utils as pulsifi_models_utils
-from pulsifi.validators import ConfusableEmailValidator, ConfusableUsernameValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedUsernameValidator
 from thefuzz import fuzz as thefuzz
 from tldextract.tldextract import ExtractResult as TLD_ExtractResult
+
+from pulsifi.models import utils as pulsifi_models_utils
+from pulsifi.validators import ConfusableEmailValidator, ConfusableUsernameValidator, ExampleEmailValidator, FreeEmailValidator, HTML5EmailValidator, PreexistingEmailTLDValidator, ReservedUsernameValidator
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 abstractmethod = abc.abstractmethod
