@@ -11,6 +11,7 @@ from django.db import models
 from django.forms import BaseModelForm
 from django.http import HttpRequest
 from rangefilter.filters import DateTimeRangeFilter
+
 from .admin_filters import AssignedModeratorListFilter, CategoryListFilter, CreatedPulsesListFilter, CreatedRepliesListFilter, DirectRepliesListFilter, DislikesListFilter, GroupListFilter, HasReportAboutObjectListFilter, LikesListFilter, RepliedObjectTypeListFilter, ReportedObjectTypeListFilter, StaffListFilter, StatusListFilter, UserContentVisibleListFilter, UserVerifiedListFilter, UserVisibleListFilter
 from .admin_inlines import About_Object_Report_Inline, Avatar_Inline, Created_Pulse_Inline, Created_Reply_Inline, Direct_Reply_Inline, Disliked_Pulse_Inline, Disliked_Reply_Inline, EmailAddress_Inline, Liked_Pulse_Inline, Liked_Reply_Inline, Moderator_Assigned_Report_Inline, Submitted_Report_Inline, _Base_Report_Inline_Config
 from .models import Follow, Pulse, Reply, Report, User
@@ -360,7 +361,7 @@ class Reply_Admin(_User_Content_Admin):
             admin pages.
         """
 
-        return f"{obj.original_pulse.id} | {obj.original_pulse}"
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"[:100]
 
     @admin.display(description="Replied Content")
     def display_replied_content(self, obj: Reply) -> str:
@@ -369,7 +370,7 @@ class Reply_Admin(_User_Content_Admin):
             this :model:`pulsifi.reply` object is a Reply to.
         """
 
-        return f"{obj.replied_content.id} | {obj.replied_content}"
+        return f"{obj.replied_content.id} | {obj.replied_content}"[:100]
 
     def get_fieldsets(self, request: HttpRequest, obj: Reply = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
@@ -520,14 +521,14 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
     autocomplete_fields = ("reporter", "assigned_moderator")
     search_help_text = "Search for a reporter, reported object type, reason, category, assigned moderator or status"
 
-    @admin.display(description="Report", ordering=("_content_type", "_object_id"))
+    @admin.display(description="Reported Object", ordering=("_content_type", "_object_id"))
     def display_reported_object(self, obj: Report) -> str:
         """
             Returns the stringified version of the given reported object
             instance, to be displayed on the admin pages.
         """
 
-        return f"{obj.reported_object.id} | {obj.reported_object}"
+        return f"{obj.reported_object.id} | {obj.reported_object}"[:100]
 
     def get_fieldsets(self, request: HttpRequest, obj: Report = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """

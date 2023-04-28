@@ -98,7 +98,7 @@ class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
 
         raise NotImplementedError
 
-    def string_when_visible(self, string: str):
+    def string_when_visible(self, string: str, truncate=True) -> str:
         """
             Returns the given string, or the given string but crossed out if
             this object is not visible.
@@ -108,8 +108,18 @@ class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
         """
 
         if self.is_visible:
-            return string
-        return "".join(f"{char}\u0336" for char in string)
+            if len(string) > settings.MESSAGE_DISPLAY_LENGTH and truncate:
+                # noinspection PyStringFormat
+                return f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}...".format(string)
+            else:
+                return string
+
+        else:
+            if len(string) > settings.MESSAGE_DISPLAY_LENGTH and truncate:
+                # noinspection PyStringFormat
+                return "".join(f"{char}\u0336" for char in f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(string)) + "..."
+            else:
+                return "".join(f"{char}\u0336" for char in string)
 
 
 class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_utils.Date_Time_Created_Mixin):  # TODO: calculate time remaining based on engagement (decide [likes increase], [likes increase & dislikes decrease], [likes & [likes of replies] increase], [[likes & [likes of replies]] increase & [dislikes & [dislikes of replies]] decrease], [likes, dislikes & replies increase] or [likes, [likes of replies], dislikes, [dislikes of replies] & replies increase]) & creator follower count
@@ -201,7 +211,12 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
             returns the crossed out message within this content.
         """
 
-        return f"{self.creator}, {self.string_when_visible(self.message[:settings.MESSAGE_DISPLAY_LENGTH])}"
+        return f"{self.creator}, {self.string_when_visible(self.message)}"
+
+    def clean(self):
+        super().clean()
+
+        self.message = " ".join(self.message.split())
 
     def get_absolute_url(self) -> str:
         """
@@ -295,7 +310,7 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
         unique=True,
         validators=[
             RegexValidator(
-                r"^[\w._]+\Z",
+                r"\A(?!.*[._]{3})(?=\A[a-zA-Z].*[a-zA-Z].*\Z)[\w.]+\Z",
                 "Enter a valid username. It must contain only letters, digits, '.' and '_'characters."
             ),
             ReservedUsernameValidator(),
@@ -438,7 +453,7 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             returns the crossed out username.
         """
 
-        return self.string_when_visible(f"@{self.username}")
+        return self.string_when_visible(f"@{self.username}", truncate=False)
 
     def clean(self) -> None:
         """
@@ -448,6 +463,8 @@ class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick 
             Uses django's argument structure so cannot be changed (see
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
+
+        self.bio = " ".join(self.bio.split())
 
         if self.is_superuser:  # NOTE: is_staff should be True if is_superuser is True
             self.is_staff = self.is_superuser
@@ -731,7 +748,7 @@ class Reply(User_Generated_Content_Model):
         ]
 
     def __str__(self) -> str:
-        return f"{self.creator}, {self.string_when_visible(self.message[:settings.MESSAGE_DISPLAY_LENGTH])} (For object - {self._content_type.name} | {self.replied_content})"[:100]
+        return f"{self.creator}, {self.string_when_visible(self.message)} (For object - {self._content_type.name} | {self.replied_content})"
 
     def clean(self) -> None:
         """
@@ -947,6 +964,8 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
             Uses django's argument structure so cannot be changed (see
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
+
+        self.reason = " ".join(self.reason.split())
 
         if self._content_type_id and self._object_id is not None:  # HACK: Don't clean the generic content relation if the values are not set (prevents error in AdminInlines where dummy objects are cleaned without values in _content_type and _object_id)
             if self._content_type.model not in self.REPORTABLE_CONTENT_TYPE_NAMES:

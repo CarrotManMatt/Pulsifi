@@ -149,7 +149,8 @@ class Following_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # 
     template_name = "pulsifi/related_users.html"
     context_object_name = "related_user_list"
     extra_context = {"follow_form": True}
-    object_list = None  # HACK: set object_list to None to prevent not set error
+
+    # object_list = None  # HACK: set object_list to None to prevent not set error
 
     def get_queryset(self) -> models.QuerySet[User]:
         return get_user_model().objects.annotate(models.Count("followers")).filter(
@@ -166,7 +167,8 @@ class Following_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # 
 class Followers_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # TODO: Inherit from combined following/followers view
     template_name = "pulsifi/related_users.html"
     context_object_name = "related_user_list"
-    object_list = None  # HACK: set object_list to None to prevent not set error
+
+    # object_list = None  # HACK: set object_list to None to prevent not set error
 
     def get_queryset(self) -> models.QuerySet[User]:
         return get_user_model().objects.annotate(models.Count("followers")).filter(
@@ -188,7 +190,7 @@ class Signup_POST_View(Base_SignupView):
     redirect_authenticated_user = True
     prefix = "signup"
 
-    def form_invalid(self, form) -> HttpResponseRedirect:  # BUG: errors don't show & login popup comes up, not signup popup (get parameters are changed)
+    def form_invalid(self, form) -> HttpResponseRedirect:  # TODO: check if errors show
         if "signup_form" in self.request.session:
             del self.request.session["signup_form"]
 
