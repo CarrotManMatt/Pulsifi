@@ -25,18 +25,20 @@
                             {% endif %}
                             <p>{{ content.message|format_mentions }}</p>
                             <span class="text-small">{{ content.liked_by.count }} Likes</span>
-                            <form style="display:inline;" method="post">  {# like action in backgroud with ajax to prevent page refresh #}
-                                {% csrf_token %}
-                                {% if request.user in content.liked_by.all %}
-                                    <input type="submit" class="btn btn-sm btn-success" value="✕ Remove Like ✕">
-                                    <input type="hidden" name="action" value="remove_like">
-                                {% else %}
-                                    <input type="submit" class="btn btn-sm btn-success" value="Like">
-                                    <input type="hidden" name="action" value="like">
-                                {% endif %}
-                                <input type="hidden" name="likeable_object_id" value="{{ content.id }}">
-                                <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
-                            </form>
+                            {% if request.user != content.creator %}
+                                <form style="display:inline;" method="post">  {# like action in backgroud with ajax to prevent page refresh #}
+                                    {% csrf_token %}
+                                    {% if request.user in content.liked_by.all %}
+                                        <input type="submit" class="btn btn-sm btn-success" value="✕ Remove Like ✕">
+                                        <input type="hidden" name="action" value="remove_like">
+                                    {% else %}
+                                        <input type="submit" class="btn btn-sm btn-success" value="Like">
+                                        <input type="hidden" name="action" value="like">
+                                    {% endif %}
+                                    <input type="hidden" name="likeable_object_id" value="{{ content.id }}">
+                                    <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
+                                </form>
+                            {% endif %}
                             <button type="button" class="btn btn-sm btn-secondary"
                                     onclick="addModalData('create-reply-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-reply-modal')">Reply to this
                                 {{ content_meta.verbose_name }}
@@ -45,18 +47,20 @@
                                     onclick="addModalData('create-report-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-report-modal')">Report This
                                 {{ content_meta.verbose_name }}
                             </button>
-                            <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}
-                                {% csrf_token %}
-                                {% if request.user in content.disliked_by.all %}
-                                    <input type="submit" class="btn btn-sm btn-danger" value="✕ Remove Dislike ✕">
-                                    <input type="hidden" name="action" value="remove_dislike">
-                                {% else %}
-                                    <input type="submit" class="btn btn-sm btn-danger" value="Dislike">
-                                    <input type="hidden" name="action" value="dislike">
-                                {% endif %}
-                                <input type="hidden" name="dislikeable_object_id" value="{{ content.id }}">
-                                <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
-                            </form>
+                            {% if request.user != content.creator %}
+                                <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}
+                                    {% csrf_token %}
+                                    {% if request.user in content.disliked_by.all %}
+                                        <input type="submit" class="btn btn-sm btn-danger" value="✕ Remove Dislike ✕">
+                                        <input type="hidden" name="action" value="remove_dislike">
+                                    {% else %}
+                                        <input type="submit" class="btn btn-sm btn-danger" value="Dislike">
+                                        <input type="hidden" name="action" value="dislike">
+                                    {% endif %}
+                                    <input type="hidden" name="dislikeable_object_id" value="{{ content.id }}">
+                                    <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
+                                </form>
+                            {% endif %}
                             <span class="text-small">{{ content.disliked_by.count }} Dislikes</span>
                             {% for reply in content.reply_set.all %}
                                 {% with content=reply %}

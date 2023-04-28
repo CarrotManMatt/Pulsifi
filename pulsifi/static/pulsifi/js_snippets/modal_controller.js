@@ -1,15 +1,25 @@
 //code adapted from: https://dev.to/ara225/how-to-use-bootstrap-modals-without-jquery-3475
 
 function openModal(modal_id) {
+    const modal = document.getElementById(modal_id)
+
     document.getElementById("backdrop").style.display = "block"
-    document.getElementById(modal_id).style.display = "block"
-    document.getElementById(modal_id).classList.add("show")
+    modal.style.display = "block"
+    modal.classList.add("show")
 }
 
 function closeModal(modal_id) {
+    const modal = document.getElementById(modal_id)
+    if (modal_id === "create-reply-modal") {
+        modal.querySelector(`#${modal_id} form`).querySelector('[id*="message"]').value = ""
+    } else if (modal_id === "create-report-modal") {
+        const form = modal.querySelector(`#${modal_id} form`)
+        form.querySelector('[id*="reason"]').value = ""
+        form.querySelector('[id*="category"]').selectedIndex = 0
+    }
     document.getElementById("backdrop").style.display = "none"
-    document.getElementById(modal_id).style.display = "none"
-    document.getElementById(modal_id).classList.remove("show")
+    modal.style.display = "none"
+    modal.classList.remove("show")
 }
 
 function addModalData(modal_id, _content_type_id, _object_id) {

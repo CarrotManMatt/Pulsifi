@@ -11,7 +11,7 @@ from django.contrib import auth
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
-from pulsifi.models import Pulse, Reply, User
+from pulsifi.models import Pulse, Reply, Report, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -201,13 +201,8 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
 
         creation_time: timezone.datetime = timezone.now()
 
-        super().clean()
-
-        if not self.creator:
-            raise ValueError("\"creator\" property must be set on this form instance in order to clean this form.")
-
         try:
-            latest_reply_of_same_original_pulse: Reply = Reply(creator=self.creator, _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse()
+            latest_reply_of_same_original_pulse: Reply = Reply(creator=self.instance.creator, _object_id=self.cleaned_data["_object_id"], _content_type=self.cleaned_data["_content_type"]).get_latest_reply_of_same_original_pulse()
         except Reply.DoesNotExist:
             pass
         else:
@@ -215,6 +210,27 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
                 raise ValidationError("Cannot create Reply so soon after already creating a Reply under this original Pulse.", code="too_recent")
 
         return self.cleaned_data
+
+
+class Report_Form(BaseFormConfig, forms.ModelForm):
+    """ Form for creating a new report. """
+
+    prefix = "create_report"
+
+    # noinspection PyMissingOrEmptyDocstring
+    class Meta:
+        model = Report
+        fields = ("reason", "category", "_content_type", "_object_id")
+        widgets = {
+            "_content_type": forms.HiddenInput,
+            "_object_id": forms.HiddenInput
+        }
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        self.fields["reason"].label = "Report reason..."
+        self.fields["reason"].widget.attrs["placeholder"] = "Report reason...."
 
 
 class Bio_Form(BaseFormConfig, forms.ModelForm):

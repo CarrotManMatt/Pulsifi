@@ -8,7 +8,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.generic.base import ContextMixin
 from el_pagination.views import MultipleObjectMixin
 
-from pulsifi.forms import Pulse_Form, Reply_Form
+from pulsifi.forms import Pulse_Form, Reply_Form, Report_Form
 from pulsifi.models import Pulse
 from pulsifi.views import post_request_checkers
 from pulsifi.views.post_request_checkers import Template_View_Mixin_Protocol
@@ -38,22 +38,23 @@ class PostRequestCheckerMixin(Template_View_Mixin_Protocol):
 
 class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin):
     object_list: models.QuerySet[Pulse]
+    context_object_name: str = "pulse_list"
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
-        context = super().get_context_data(**kwargs)
-
         self.object_list = self.get_queryset()
-        context.update(
-            {
-                "pulse_list": self.object_list,
-                "content_iterate_snippet": "pulsifi/content_iterate_snippet.html"
-            }
-        )
+
+        context = {'view': self, "content_iterate_snippet": "pulsifi/content_iterate_snippet.html"} | kwargs
+
+        context_object_name = self.get_context_object_name(self.object_list)
+        if context_object_name is not None:
+            context[context_object_name] = self.object_list
 
         if "create_pulse_form" not in context:
             context["create_pulse_form"] = Pulse_Form(prefix="create_pulse")
         if "create_reply_form" not in context:
             context["create_reply_form"] = Reply_Form(prefix="create_reply")
+        if "create_report_form" not in context:
+            context["create_report_form"] = Report_Form(prefix="create_report")
 
         return context
 
@@ -61,7 +62,7 @@ class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin)
     def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
         return super().get_post_request_checker_functions() | {
             post_request_checkers.check_add_or_remove_like_or_dislike_in_post_request,
-            post_request_checkers.check_create_pulse_or_reply_in_post_request
+            post_request_checkers.check_create_pulse_or_reply_or_report_in_post_request
         }
 
 
