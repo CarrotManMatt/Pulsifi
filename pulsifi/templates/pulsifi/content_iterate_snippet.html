@@ -1,7 +1,10 @@
 {% load avatar_tags %}
 {% load pulsifi_extras %}
+{% load static %}
+
 {% model_meta content as content_meta %}
 {% model_content_type content as content_content_type %}
+
 <div class="container-fluid p-5 text-center">
     <div class="card flex-x5-nowrap">
         <div class="tab-content admin-tab-content pt30">
@@ -17,7 +20,7 @@
                         </div>
                         <div class="act-content">
                             <div class="font400">
-                                <a href="{{ content.creator.get_absolute_url }}" class="font600">{{ content.creator }}</a> replied
+                                <a href="{{ content.creator.get_absolute_url }}" class="font600 align-middle">{{ content.creator }}{% if content.creator.is_verified %}<img class="mx-1 pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}</a> {% if content_meta.model_name == "pulse" %}posted{% elif content_meta.model_name == "reply" %}replied{% endif %}
                             </div>
                             {% if content_meta.model_name == "pulse" %}
                                 <span class="text-small">{{ content.date_time_created|timesince }} Ago</span>
