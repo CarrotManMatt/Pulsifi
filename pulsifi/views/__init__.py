@@ -82,7 +82,7 @@ class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast fo
         return context
 
 
-class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: POST actions for pulses & replies, only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, show replies, toast for successful redirect after login, highlight pulse/reply (from get parameters) at top of page or message if not visible
+class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login, highlight pulse/reply (from get parameters) at top of page or message if not visible
     template_name = "pulsifi/feed.html"
 
     def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
@@ -107,7 +107,7 @@ class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: POST
         return queryset
 
 
-class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast for users that have just signed up to edit their bio/avatar
+class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast for users that have just signed up or just edited their bio/avatar
     query_string = True
 
     def get_redirect_url(self, *args, **kwargs) -> str:
@@ -117,7 +117,7 @@ class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast f
         )
 
 
-class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: POST actions for pulses & replies, only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, change profile parts (if self profile), delete account with modal or view all finished pulses (if self profile), show replies, toast for account creation, prevent create new pulses/replies if >3 in progress or >1 completed reports on user or pulse/reply of user
+class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, change profile parts (if self profile), delete account with modal toast for account creation, prevent create new pulses/replies if (>3 in progress or >1 completed) reports on user or pulse/reply of user
     template_name = "pulsifi/account.html"
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
@@ -190,7 +190,7 @@ class Followers_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # 
         }
 
 
-# TODO: profile search view, leaderboard view, report views
+# TODO: profile search view, leaderboard view
 
 
 class Signup_POST_View(Base_SignupView):

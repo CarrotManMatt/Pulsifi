@@ -238,7 +238,7 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
         raise NotImplementedError
 
 
-class User(Visible_Reportable_Mixin, AbstractUser):  # TODO: show verified tick or staff badge next to username
+class User(Visible_Reportable_Mixin, AbstractUser):
     """
         Model to define changes to existing fields/extra fields & processing
         for users, beyond that/those given by Django's base :model:`auth.user`

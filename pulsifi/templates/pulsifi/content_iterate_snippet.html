@@ -20,7 +20,7 @@
                         </div>
                         <div class="act-content mb-3">
                             <div class="font400">
-                                <a href="{{ content.creator.get_absolute_url }}" class="font600 align-middle">{{ content.creator }}{% if content.creator.is_verified %}<img class="mx-1 pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}</a> {% if content_meta.model_name == "pulse" %}posted{% elif content_meta.model_name == "reply" %}replied{% endif %}
+                                <a href="{{ content.creator.get_absolute_url }}" class="font600 align-middle">{{ content.creator }}{% if content.creator.is_verified %}<img class="mx-1 pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}{% if content.creator.is_staff %}<img class="pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Staff.png" %}" alt="staff member icon">{% endif %}</a> {% if content_meta.model_name == "pulse" %}posted{% elif content_meta.model_name == "reply" %}replied{% endif %}
                             </div>
                             {% if content_meta.model_name == "pulse" %}
                                 <span class="text-small">{{ content.date_time_created|timesince }} Ago</span>
