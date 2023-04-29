@@ -17,7 +17,7 @@ from django.views.generic.base import TemplateView
 from el_pagination.views import AjaxListView
 
 from pulsifi.exceptions import GETParameterError
-from pulsifi.forms import Login_Form, Signup_Form
+from pulsifi.forms import Bio_Form, Login_Form, Signup_Form
 from pulsifi.models import Pulse, User
 from . import post_request_checkers
 from .mixins import PostRequestCheckerMixin, PulseListMixin, RedirectAuthenticatedUserMixin
@@ -123,6 +123,13 @@ class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  
     def get_context_data(self, **kwargs) -> dict[str, ...]:
         context = super().get_context_data(**kwargs)
 
+        if self.kwargs.get("username") == self.request.user.username and "update_bio_form" not in context:
+            user: User = self.request.user
+            context["update_bio_form"] = Bio_Form(
+                prefix="update_bio",
+                initial={"bio": user.bio}
+            )
+
         context["specific_account"] = django_shortcuts.get_object_or_404(
             get_user_model(),
             is_active=True,
@@ -141,7 +148,8 @@ class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  
     @classmethod
     def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
         return super().get_post_request_checker_functions() | {
-            post_request_checkers.check_follow_or_unfollow_in_post_request
+            post_request_checkers.check_follow_or_unfollow_in_post_request,
+            post_request_checkers.check_update_bio_in_post_request
         }
 
 

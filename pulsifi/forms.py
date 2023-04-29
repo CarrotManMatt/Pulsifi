@@ -242,3 +242,8 @@ class Bio_Form(BaseFormConfig, forms.ModelForm):
     class Meta:
         model = get_user_model()
         fields = ("bio",)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["bio"].required = True

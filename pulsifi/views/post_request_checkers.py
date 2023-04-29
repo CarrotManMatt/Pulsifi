@@ -6,7 +6,7 @@ from django.contrib import auth
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.template.response import TemplateResponse
 
-from pulsifi.forms import Pulse_Form, Reply_Form, Report_Form
+from pulsifi.forms import Bio_Form, Pulse_Form, Reply_Form, Report_Form
 from pulsifi.models import Pulse, Reply, User
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
@@ -175,3 +175,28 @@ def check_create_pulse_or_reply_or_report_in_post_request(view: Template_View_Mi
                 return view.render_to_response(
                     view.get_context_data(create_report_form=report_form)
                 )
+
+
+def check_update_bio_in_post_request(view: Template_View_Mixin_Protocol) -> bool | HttpResponse:
+    try:
+        action: str = view.request.POST["action"].lower()
+    except KeyError:
+        return False
+
+    else:
+        if action != "update_bio":
+            return False
+
+        bio_form = Bio_Form(view.request.POST, prefix="update_bio")
+        if bio_form.is_valid():
+            user: User = view.request.user
+
+            user.refresh_from_db()
+            user.update(bio=bio_form.cleaned_data["bio"])
+
+            return django_shortcuts.redirect(user)
+
+        else:
+            return view.render_to_response(
+                view.get_context_data(update_bio_form=bio_form)
+            )

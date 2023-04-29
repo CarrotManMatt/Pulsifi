@@ -43,7 +43,7 @@ class PulseListMixin(MultipleObjectMixin, ContextMixin, PostRequestCheckerMixin)
     def get_context_data(self, **kwargs) -> dict[str, ...]:
         self.object_list = self.get_queryset()
 
-        context = {'view': self, "content_iterate_snippet": "pulsifi/content_iterate_snippet.html"} | kwargs
+        context = {"view": self, "content_iterate_snippet": "pulsifi/content_iterate_snippet.html"} | kwargs
 
         context_object_name = self.get_context_object_name(self.object_list)
         if context_object_name is not None:

@@ -5,7 +5,7 @@
 {% model_meta content as content_meta %}
 {% model_content_type content as content_content_type %}
 
-<div class="container-fluid p-5 text-center">
+<div class="container-fluid px-5 pt-3 text-center">
     <div class="card flex-x5-nowrap">
         <div class="tab-content admin-tab-content pt30">
             <div role="tabpanel" class="tab-pane active show">
@@ -18,7 +18,7 @@
                                 </a>
                             </div>
                         </div>
-                        <div class="act-content">
+                        <div class="act-content mb-3">
                             <div class="font400">
                                 <a href="{{ content.creator.get_absolute_url }}" class="font600 align-middle">{{ content.creator }}{% if content.creator.is_verified %}<img class="mx-1 pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}</a> {% if content_meta.model_name == "pulse" %}posted{% elif content_meta.model_name == "reply" %}replied{% endif %}
                             </div>
@@ -26,7 +26,7 @@
                                 <span class="text-small">{{ content.date_time_created|timesince }} Ago</span>
                                 <div>{{ content_meta.verbose_name }} will be deleted in <p id="time">??:??</p></div>
                             {% endif %}
-                            <p>{{ content.message|format_mentions }}</p>
+                            <p class="fs-5">{{ content.message|format_mentions }}</p>
                             <span class="text-small">{{ content.liked_by.count }} Likes</span>
                             {% if request.user != content.creator %}
                                 <form style="display:inline;" method="post">  {# like action in backgroud with ajax to prevent page refresh #}

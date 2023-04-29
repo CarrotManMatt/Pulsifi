@@ -30,8 +30,8 @@
                                 {% if specific_account == request.user %}
                                     <form method="post">
                                         {% csrf_token %}
-                                        <label for="new-bio" class="d-none">New Bio</label>
-                                        <input type="text" style="width: 100%;" required id="new-bio" name="new_bio" value="{{ specific_account.bio }}">
+                                        <input type="hidden" name="action" value="update_bio">
+                                        {{ update_bio_form }}
                                         <input type="submit" value="Update bio">
                                     </form>
                                 {% else %}
@@ -67,11 +67,11 @@
                                     <form method="post">
                                         {% csrf_token %}
                                         {% if request.user not in specific_account.followers.all %}
-                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple" value="Follow">
+                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple border-0" value="Follow">
                                             <input type="hidden" name="action" value="follow">
                                             <input type="hidden" name="follow_user_id" value="{{ specific_account.id }}">
                                         {% else %}
-                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple" value="Unfollow">
+                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple border-0" value="Unfollow">
                                             <input type="hidden" name="action" value="unfollow">
                                             <input type="hidden" name="unfollow_user_id" value="{{ specific_account.id }}">
                                         {% endif %}
@@ -115,7 +115,7 @@
         <div class="mx-auto">
             <div class="row">
                 <div class="col-sm">
-                    <h1 class="align-middle" style="color:#ba03fc">{% if specific_account == request.user %}Your{% else %}{{ specific_account }}'s{% endif %}{% if specific_account.is_verified %}<img class="mx-1 pb-1" width="28" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %} Pulses</h1>
+                    <h1 class="align-middle" style="color:#ba03fc">{% if specific_account == request.user %}Your{% else %}{{ specific_account }}'s{% if specific_account.is_verified %}<img class="mx-1 pb-1" width="28" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}{% endif %} Pulses</h1>
                 </div>
                 <div class="col-sm-2 pt-3">
                     <button type="button" class="btn w3-purple" style="float: right;" id="create-pulse-modal-button">New Pulse</button>
