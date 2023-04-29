@@ -46,10 +46,12 @@
                                     onclick="addModalData('create-reply-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-reply-modal')">Reply to this
                                 {{ content_meta.verbose_name }}
                             </button>
-                            <button type="button" class="btn btn-sm btn-info"
-                                    onclick="addModalData('create-report-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-report-modal')">Report This
-                                {{ content_meta.verbose_name }}
-                            </button>
+                            {% if not content.creator|user_is_admin and request.user != content.creator %}
+                                <button type="button" class="btn btn-sm btn-info"
+                                        onclick="addModalData('create-report-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-report-modal')">Report this
+                                    {{ content_meta.verbose_name }}
+                                </button>
+                            {% endif %}
                             {% if request.user != content.creator %}
                                 <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}
                                     {% csrf_token %}

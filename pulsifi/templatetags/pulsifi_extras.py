@@ -13,6 +13,8 @@ from django.db.models.options import Options as Model_Options
 from django.template import defaultfilters, loader as template_utils
 from django.utils import html as html_utils, safestring
 
+from pulsifi.models import User
+
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
 register = template.Library()
@@ -84,3 +86,8 @@ def model_content_type(obj: models.Model) -> bool | ContentType:
         return False
 
     return ContentType.objects.get_for_model(obj)
+
+
+@register.filter
+def user_is_admin(user: User) -> bool:
+    return user.is_superuser and user.groups.filter(name="Admins").exists()

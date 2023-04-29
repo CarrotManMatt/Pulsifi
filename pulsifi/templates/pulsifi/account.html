@@ -76,10 +76,12 @@
                                             <input type="hidden" name="unfollow_user_id" value="{{ specific_account.id }}">
                                         {% endif %}
                                     </form>
-                                    {% model_content_type specific_account as specific_account_content_type %}
-                                    <button type="button" class="btn btn-sm btn-info"
-                                            onclick="addModalData('create-report-modal', {{ specific_account_content_type.id }}, '{{ specific_account.id }}');openModal('create-report-modal')">Report User
-                                    </button>
+                                    {% if not specific_account|user_is_admin %}
+                                        {% model_content_type specific_account as specific_account_content_type %}
+                                        <button type="button" class="btn btn-sm btn-info"
+                                                onclick="addModalData('create-report-modal', {{ specific_account_content_type.id }}, '{{ specific_account.id }}');openModal('create-report-modal')">Report User
+                                        </button>
+                                    {% endif %}
                                 </div>
                             {% else %}
                                 <p>Send an email to <a class="text-primary" href="mailto:verification@pulsifi.tech">verification@pulsifi.tech</a> to request verification.</p>
