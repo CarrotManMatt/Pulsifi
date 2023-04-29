@@ -9,10 +9,11 @@ import re as regex
 from pathlib import Path
 
 import tldextract
-from core import utils as core_url_utils
 from django import urls as django_urls
 from django.core.exceptions import ImproperlyConfigured
 from environ import Env
+
+from core import utils as core_url_utils
 
 # Build paths inside the project like this: BASE_DIR / "subdir"
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -33,7 +34,7 @@ env = Env(
     EMAIL_HOST_USER=(str, "no-reply@pulsifi.tech"),
     EMAIL_USE_SSL=(bool, True),
     PULSIFI_ADMIN_COUNT=(int, 1),
-    MESSAGE_DISPLAY_LENGTH=(int, 15),
+    MESSAGE_DISPLAY_LENGTH=(int, 35),
     MIN_TIME_BETWEEN_REPLIES_ON_SAME_POST=(float, 3.0),
     FOLLOWER_COUNT_SCALING_FUNCTION=(str, "linear"),
     PASSWORD_SIMILARITY_TO_USER_ATTRIBUTES=(float, 0.627),

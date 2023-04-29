@@ -10,8 +10,9 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.template import RequestContext
 from django.test.utils import ContextList
+
 from pulsifi import models as pulsifi_models
-from pulsifi.models import utils as pulsifi_models_utils, User
+from pulsifi.models import User, utils as pulsifi_models_utils
 from pulsifi.tests import utils as pulsifi_tests_utils
 from pulsifi.tests.utils import Base_TestCase, Base_Test_Data_Factory, Test_User_Factory
 
@@ -196,14 +197,14 @@ class Visible_Reportable_Mixin_Tests(Base_TestCase):
 
             self.assertEqual(
                 string,
-                obj.string_when_visible(string)
+                obj.string_when_visible(string, truncate=False)
             )
 
             obj.update(is_visible=False)
 
             self.assertEqual(
                 "".join(f"{char}\u0336" for char in string),
-                obj.string_when_visible(string)
+                obj.string_when_visible(string, truncate=False)
             )
 
     def test_get_absolute_url(self):

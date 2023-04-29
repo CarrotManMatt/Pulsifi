@@ -13,10 +13,10 @@ from django.db import IntegrityError, transaction
 from django.db.models import QuerySet
 
 from pulsifi import models as pulsifi_models
-from pulsifi.models import Follow, Report, User, Pulse, Reply
+from pulsifi.models import Follow, Pulse, Reply, Report, User
 from pulsifi.tests import utils as pulsifi_tests_utils
-from pulsifi.tests.utils import Base_TestCase, Test_Report_Factory, Test_User_Factory, Test_Reply_Factory, Test_Pulse_Factory
-from pulsifi.validators import ReservedUsernameValidator, FreeEmailValidator, ExampleEmailValidator
+from pulsifi.tests.utils import Base_TestCase, Test_Pulse_Factory, Test_Reply_Factory, Test_Report_Factory, Test_User_Factory
+from pulsifi.validators import ExampleEmailValidator, FreeEmailValidator, ReservedUsernameValidator
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
@@ -476,14 +476,24 @@ class Pulse_Model_Tests(Base_TestCase):
     def test_stringify_displays_in_correct_format(self):
         pulse: Pulse = Test_Pulse_Factory.create()
 
+        while len(pulse.message) <= settings.MESSAGE_DISPLAY_LENGTH:
+            pulse.update(
+                message=Test_Pulse_Factory.create_field_value("message")
+            )
+
+        pulse.refresh_from_db()
+
+        # noinspection PyStringFormat
+        message: str = f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(pulse.message).rstrip() + "..."
         self.assertEqual(
-            f"{pulse.creator}, {pulse.message[:settings.MESSAGE_DISPLAY_LENGTH]}",
+            f"{pulse.creator}, {message}",
             str(pulse)
         )
 
         pulse.update(is_visible=False)
 
-        message: str = "".join(char + "\u0336" for char in pulse.message[:settings.MESSAGE_DISPLAY_LENGTH])
+        # noinspection PyStringFormat
+        message: str = "".join(f"{char}\u0336" for char in f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(pulse.message).rstrip()) + "..."
         self.assertEqual(
             f"{pulse.creator}, {message}",
             str(pulse)
@@ -553,16 +563,26 @@ class Reply_Model_Tests(Base_TestCase):
     def test_stringify_displays_in_correct_format(self):
         reply: Reply = Test_Reply_Factory.create()
 
+        while len(reply.message) <= settings.MESSAGE_DISPLAY_LENGTH:
+            reply.update(
+                message=Test_Reply_Factory.create_field_value("message")
+            )
+
+        reply.refresh_from_db()
+
+        # noinspection PyStringFormat
+        message: str = f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(reply.message).rstrip() + "..."
         self.assertEqual(
-            f"{reply.creator}, {reply.message[:settings.MESSAGE_DISPLAY_LENGTH]} (For object - {reply._content_type.name} | {reply.replied_content})"[:100],
+            f"{reply.creator}, {message} (For object - {reply._content_type.name} | {reply.replied_content})",
             str(reply)
         )
 
         reply.update(is_visible=False)
 
-        message: str = "".join(char + "\u0336" for char in reply.message[:settings.MESSAGE_DISPLAY_LENGTH])
+        # noinspection PyStringFormat
+        message: str = "".join(f"{char}\u0336" for char in f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(reply.message).rstrip()) + "..."
         self.assertEqual(
-            f"{reply.creator}, {message} (For object - {reply._content_type.name} | {reply.replied_content})"[:100],
+            f"{reply.creator}, {message} (For object - {reply._content_type.name} | {reply.replied_content})",
             str(reply)
         )
 

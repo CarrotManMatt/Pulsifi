@@ -3,8 +3,9 @@
 """
 
 from django.contrib.contenttypes.models import ContentType
-from pulsifi.forms import Login_Form, Signup_Form, Pulse_Form, Reply_Form, Bio_Form
-from pulsifi.tests.utils import Base_TestCase, Test_User_Factory, Test_Reply_Factory
+
+from pulsifi.forms import Bio_Form, Login_Form, Pulse_Form, Reply_Form, Signup_Form
+from pulsifi.tests.utils import Base_TestCase, Test_Reply_Factory, Test_User_Factory
 
 
 class Login_Form_Tests(Base_TestCase):
@@ -70,7 +71,7 @@ class Reply_Form_Tests(Base_TestCase):
                 "create_reply-_object_id": reply.original_pulse.id
             }
         )
-        reply_form.creator = reply.creator
+        reply_form.instance.creator = reply.creator
 
         self.assertIn(
             "Cannot create Reply so soon after already creating a Reply under this original Pulse.",

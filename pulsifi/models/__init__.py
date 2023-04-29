@@ -110,14 +110,14 @@ class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
         if self.is_visible:
             if len(string) > settings.MESSAGE_DISPLAY_LENGTH and truncate:
                 # noinspection PyStringFormat
-                return f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}...".format(string)
+                return f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(string).rstrip() + "..."
             else:
                 return string
 
         else:
             if len(string) > settings.MESSAGE_DISPLAY_LENGTH and truncate:
                 # noinspection PyStringFormat
-                return "".join(f"{char}\u0336" for char in f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(string)) + "..."
+                return "".join(f"{char}\u0336" for char in f"{{:.{settings.MESSAGE_DISPLAY_LENGTH}}}".format(string).rstrip()) + "..."
             else:
                 return "".join(f"{char}\u0336" for char in string)
 
@@ -463,8 +463,8 @@ class User(Visible_Reportable_Mixin, AbstractUser):
             Uses django's argument structure so cannot be changed (see
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.clean).
         """
-
-        self.bio = " ".join(self.bio.split())
+        if self.bio:
+            self.bio = " ".join(self.bio.split())
 
         if self.is_superuser:  # NOTE: is_staff should be True if is_superuser is True
             self.is_staff = self.is_superuser
@@ -971,7 +971,7 @@ class Report(pulsifi_models_utils.Custom_Base_Model, pulsifi_models_utils.Date_T
             if self._content_type.model not in self.REPORTABLE_CONTENT_TYPE_NAMES:
                 raise ValidationError({"_content_type": f"The Content Type: {self._content_type.name} is not one of the allowed options: User, Pulse, Reply."}, code="invalid")
 
-            if (self._content_type.model == "user" and not get_user_model().objects.filter(id=self._object_id).exists()) or (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):  # TODO: Check if this validation is needed or just inbuilt
+            if (self._content_type.model == "user" and not get_user_model().objects.filter(id=self._object_id).exists()) or (self._content_type.model == "pulse" and not Pulse.objects.filter(id=self._object_id).exists()) or (self._content_type.model == "reply" and not Reply.objects.filter(id=self._object_id).exists()):
                 raise ValidationError("Reported object must be valid object.", code="invalid")
 
             if self._content_type.model in {"pulse", "reply"}:
