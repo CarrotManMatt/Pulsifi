@@ -154,6 +154,25 @@ class Signup_Form(BaseFormConfig, Base_SignupForm):
             logging.error(f"Validation error {repr(exception)} raised without a field name supplied.")
 
 
+class User_Generated_Content_Form(BaseFormConfig, forms.ModelForm):
+    def clean(self) -> dict[str]:
+        if not self.instance.creator:
+            raise AttributeError(f"Attribute \"creator\" must be set on this {self.__class__.__name__}'s instance before cleaning.")
+
+        if Report.objects.filter().count() > settings.OPEN_REPORTS_LIMIT:
+            raise ValidationError(f"Cannot create new {self._meta.model.verbose_name}, because there are too many open reports created about you.", code="too_many_reports")
+        elif Report.objects.filter().count() > settings.COMPLETED_REPORTS_LIMIT:
+            raise ValidationError(f"Cannot create new {self._meta.model.verbose_name}, because there are too many open reports created about you.", code="too_many_reports")
+
+        return self.cleaned_data
+
+    def save(self, commit=True):
+        if not self.instance.creator:
+            raise ValueError(f"Attribute \"creator\" must be set on this {self.__class__.__name__}'s instance before saving.")
+
+        return super().save(commit=commit)
+
+
 class Pulse_Form(BaseFormConfig, forms.ModelForm):
     """ Form for creating a new Pulse """
 
@@ -199,6 +218,8 @@ class Reply_Form(BaseFormConfig, forms.ModelForm):
             :model:`pulsifi.reply` object.
         """
 
+        super().clean()
+
         creation_time: timezone.datetime = timezone.now()
 
         try:
@@ -231,6 +252,12 @@ class Report_Form(BaseFormConfig, forms.ModelForm):
 
         self.fields["reason"].label = "Report reason..."
         self.fields["reason"].widget.attrs["placeholder"] = "Report reason...."
+
+    def save(self, commit=True):
+        if not self.instance.reporter:
+            raise AttributeError("Attribute \"reporter\" must be set on this Report_Form's instance before saving.")
+
+        return super().save(commit=commit)
 
 
 class Bio_Form(BaseFormConfig, forms.ModelForm):
