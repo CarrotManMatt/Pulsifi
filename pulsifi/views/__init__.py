@@ -7,6 +7,7 @@ from typing import Callable
 
 from allauth.account.views import LoginView as Base_LoginView, SignupView as Base_SignupView
 from django import shortcuts as django_shortcuts, urls as django_urls
+from django.apps import apps
 from django.conf import settings
 from django.contrib import auth
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -18,7 +19,7 @@ from el_pagination.views import AjaxListView
 
 from pulsifi.exceptions import GETParameterError
 from pulsifi.forms import Bio_Form, Login_Form, Signup_Form
-from pulsifi.models import Pulse, User
+from pulsifi.models import Pulse, Reply, User
 from . import post_request_checkers
 from .mixins import PostRequestCheckerMixin, PulseListMixin, RedirectAuthenticatedUserMixin
 from .post_request_checkers import Template_View_Mixin_Protocol
@@ -82,7 +83,7 @@ class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast fo
         return context
 
 
-class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login, highlight pulse/reply (from get parameters) at top of page or message if not visible
+class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login
     template_name = "pulsifi/feed.html"
 
     def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
@@ -96,15 +97,34 @@ class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only
         queryset: models.QuerySet[Pulse] = user.get_feed_pulses()
 
         if self.request.method == "GET" and "highlight" in self.request.GET:
-            # noinspection PyTypeChecker
-            highlight: str = self.request.GET["highlight"]
-
-            try:
-                return queryset.exclude(id=int(highlight))
-            except ValueError as e:
-                raise GETParameterError(get_parameters={"highlight": highlight}) from e
+            model_name: str
+            object_id: str
+            # noinspection PyUnresolvedReferences
+            model_name, _, object_id = self.request.GET["highlight"].partition("_")
+            if model_name == "pulse" and object_id.isdecimal():
+                return queryset.exclude(id=object_id)
 
         return queryset
+
+    def get_context_data(self, **kwargs) -> dict[str, ...]:
+        context = super().get_context_data(**kwargs)
+
+        context["attempted_highlight"] = False
+
+        if self.request.method == "GET" and "highlight" in self.request.GET:
+            context["attempted_highlight"] = True
+
+            model_name: str
+            object_id: str
+            # noinspection PyUnresolvedReferences
+            model_name, _, object_id = self.request.GET["highlight"].partition("_")
+            if model_name in {"pulse", "reply"} and object_id.isdecimal():
+                try:
+                    context["highlight"] = apps.get_model(app_label="pulsifi", model_name=model_name).objects.get(id=object_id)
+                except (Pulse.DoesNotExist, Reply.DoesNotExist):
+                    pass
+
+        return context
 
 
 class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast for users that have just signed up or just edited their bio/avatar
@@ -153,41 +173,31 @@ class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  
         }
 
 
-class Following_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # TODO: Inherit from combined following/followers view
+class Related_Users_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):
     template_name = "pulsifi/related_users.html"
     context_object_name = "related_user_list"
-    extra_context = {"follow_form": True}
 
-    # object_list = None  # HACK: set object_list to None to prevent not set error
+    @classmethod
+    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
+        return super().get_post_request_checker_functions() | {
+            post_request_checkers.check_follow_or_unfollow_in_post_request
+        }
+
+
+class Following_View(Related_Users_View):
+    extra_context = {"follow_form": True}
 
     def get_queryset(self) -> models.QuerySet[User]:
         return get_user_model().objects.annotate(models.Count("followers")).filter(
             followers=self.request.user
         ).order_by("-followers__count")
 
-    @classmethod
-    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
-        return super().get_post_request_checker_functions() | {
-            post_request_checkers.check_follow_or_unfollow_in_post_request
-        }
 
-
-class Followers_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):  # TODO: Inherit from combined following/followers view
-    template_name = "pulsifi/related_users.html"
-    context_object_name = "related_user_list"
-
-    # object_list = None  # HACK: set object_list to None to prevent not set error
-
+class Followers_View(Related_Users_View):
     def get_queryset(self) -> models.QuerySet[User]:
         return get_user_model().objects.annotate(models.Count("followers")).filter(
             following=self.request.user
         ).order_by("-followers__count")
-
-    @classmethod
-    def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
-        return super().get_post_request_checker_functions() | {
-            post_request_checkers.check_follow_or_unfollow_in_post_request
-        }
 
 
 # TODO: profile search view, leaderboard view

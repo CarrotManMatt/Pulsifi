@@ -226,7 +226,7 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
             https://docs.djangoproject.com/en/4.1/ref/models/instances/#django.db.models.Model.get_absolute_url).
         """
 
-        return f"""{django_urls_utils.reverse("pulsifi:feed")}?{self._meta.model_name}={self.id}"""
+        return f"""{django_urls_utils.reverse("pulsifi:feed")}?highlight={self._meta.model_name}_{self.id}"""
 
     @abstractmethod
     def get_full_depth_replies(self) -> set["Reply"]:

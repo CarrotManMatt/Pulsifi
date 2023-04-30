@@ -4,6 +4,12 @@
 {% block title %}Feed{% endblock %}
 
 {% block content %}
+    {% if highlight and attempted_highlight %}
+        {% include content_iterate_snippet with content=highlight %}
+    {% elif attempted_highlight %}
+        <h3>The requested content could not be highlighted</h3>
+    {% endif %}
+
     <div class="container py-5">
         <div class="mx-auto">
             <div class="container-fluid p-5">
