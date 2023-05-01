@@ -5,6 +5,7 @@
 import abc
 import logging
 import random
+from typing import Iterable
 
 import tldextract
 from allauth import utils as allauth_core_utils
@@ -86,6 +87,18 @@ class Visible_Reportable_Mixin(pulsifi_models_utils.Custom_Base_Model):
         self.save()
 
         return 0, {}
+
+    @property
+    def hidden_by_open_reports(self) -> bool:
+        return self.about_object_report_set.filter(status=Report.Statuses.IN_PROGRESS).count() > settings.OPEN_REPORTS_LIMIT
+
+    @property
+    def hidden_by_completed_reports(self) -> bool:
+        return self.about_object_report_set.filter(status=Report.Statuses.COMPLETED).count() > settings.COMPLETED_REPORTS_LIMIT
+
+    @property
+    def hidden_by_reports(self) -> bool:
+        return self.hidden_by_open_reports or self.hidden_by_completed_reports
 
     @abstractmethod
     def get_absolute_url(self):
@@ -227,6 +240,9 @@ class User_Generated_Content_Model(Visible_Reportable_Mixin, pulsifi_models_util
         """
 
         return f"""{django_urls_utils.reverse("pulsifi:feed")}?highlight={self._meta.model_name}_{self.id}"""
+
+    def get_visible_replies(self) -> set["Reply"]:
+        return {reply for reply in self.reply_set.filter(is_visible=True) if not reply.hidden_by_reports}
 
     @abstractmethod
     def get_full_depth_replies(self) -> set["Reply"]:
@@ -436,6 +452,14 @@ class User(Visible_Reportable_Mixin, AbstractUser):
     def is_visible(self, value: bool):
         self.is_active = value
 
+    @property
+    def hidden_by_open_reports(self) -> bool:
+        return super().hidden_by_open_reports or Report.objects.filter(_content_type__model__in={"pulse", "reply"}, reported_object__creator=self, status=Report.Statuses.IN_PROGRESS).count() > settings.OPEN_REPORTS_LIMIT
+
+    @property
+    def hidden_by_completed_reports(self) -> bool:
+        return super().hidden_by_completed_reports or Report.objects.filter(_content_type__model__in={"pulse", "reply"}, reported_object__creator=self, status=Report.Statuses.COMPLETED).count() > settings.COMPLETED_REPORTS_LIMIT
+
     class Meta:
         verbose_name = "User"
 
@@ -567,15 +591,21 @@ class User(Visible_Reportable_Mixin, AbstractUser):
 
         return django_urls_utils.reverse("pulsifi:specific_account", kwargs={"username": self.username})
 
-    def get_feed_pulses(self) -> models.QuerySet["Pulse"]:
+    def get_feed_pulses(self, exclude: Iterable[int | str] = None) -> set["Pulse"]:
         """
             Returns the set of :model:`pulsifi.pulse` objects that should be
             displayed on the :view:`pulsifi.views.Feed_View` for this user.
         """  # ISSUE: Admindocs does not generate link to view correctly
 
-        return Pulse.objects.filter(
-            creator__in=self.following.exclude(is_active=False)
+        feed_pulses: models.QuerySet["Pulse"] = Pulse.objects.filter(
+            creator__in=self.following.exclude(is_active=False),
+            is_visible=True
         ).order_by("_date_time_created")
+
+        if exclude:
+            feed_pulses = feed_pulses.exclude(id__in=exclude)
+
+        return {pulse for pulse in feed_pulses if not pulse.hidden_by_reports}
 
     @classmethod
     def get_proxy_field_names(cls) -> set[str]:

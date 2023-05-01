@@ -25,27 +25,6 @@ class HttpResponseBadRequestError(Exception):
         return f"{self.message} (request={repr(self.request)})"
 
 
-class GETParameterError(Exception):
-    """ Provided GET parameters in HTTP request contain an invalid value. """
-
-    DEFAULT_MESSAGE = "One or more of the supplied GET parameters have an invalid value."
-
-    def __init__(self, message: str = None, get_parameters: dict[str, str] = None) -> None:
-        self.message = message or self.DEFAULT_MESSAGE
-
-        if get_parameters is None:
-            self.get_parameters = {}
-        else:
-            self.get_parameters = get_parameters
-
-        super().__init__(message or self.DEFAULT_MESSAGE)
-
-    def __str__(self) -> str:
-        """ Returns formatted message & properties of the GetParameterError. """
-
-        return f"{self.message} (get_parameters={repr(self.get_parameters)})"
-
-
 class ReportableContentTypeNamesSettingError(ValueError):
     """
         Provided REPORTABLE_CONTENT_TYPE_NAMES contains a value that is not a

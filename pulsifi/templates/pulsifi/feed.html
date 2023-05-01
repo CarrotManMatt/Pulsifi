@@ -4,10 +4,10 @@
 {% block title %}Feed{% endblock %}
 
 {% block content %}
-    {% if highlight and attempted_highlight %}
+    {% if highlight %}
         {% include content_iterate_snippet with content=highlight %}
-    {% elif attempted_highlight %}
-        <h3>The requested content could not be highlighted</h3>
+    {% elif failed_highlight %}
+        <h3>{{ failed_highlight }}</h3>
     {% endif %}
 
     <div class="container py-5">

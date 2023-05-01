@@ -67,7 +67,7 @@
                                 </form>
                             {% endif %}
                             <span class="text-small">{{ content.disliked_by.count }} Dislikes</span>
-                            {% for reply in content.reply_set.all %}
+                            {% for reply in content.get_visible_replies %}
                                 {% with content=reply %}
                                     {% include "pulsifi/content_iterate_snippet.html" %}
                                 {% endwith %}

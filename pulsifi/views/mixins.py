@@ -3,13 +3,14 @@ from typing import Callable
 from allauth.account import utils as allauth_utils
 from allauth.account.views import RedirectAuthenticatedUserMixin as Base_RedirectAuthenticatedUserMixin
 from django.contrib.auth import REDIRECT_FIELD_NAME as DEFAULT_REDIRECT_FIELD_NAME
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import models
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.views.generic.base import ContextMixin
 from el_pagination.views import MultipleObjectMixin
 
 from pulsifi.forms import Pulse_Form, Reply_Form, Report_Form
-from pulsifi.models import Pulse
+from pulsifi.models import Pulse, User
 from pulsifi.views import post_request_checkers
 from pulsifi.views.post_request_checkers import Template_View_Mixin_Protocol
 
@@ -77,3 +78,11 @@ class RedirectAuthenticatedUserMixin(Base_RedirectAuthenticatedUserMixin):
         ) or allauth_utils.get_login_redirect_url(
             self.request
         )
+
+
+class CanLoginMixin(LoginRequiredMixin, UserPassesTestMixin):
+    request: HttpRequest
+
+    def test_func(self) -> bool:
+        user: User = self.request.user
+        return user.hidden_by_reports

@@ -10,24 +10,22 @@ from django import shortcuts as django_shortcuts, urls as django_urls
 from django.apps import apps
 from django.conf import settings
 from django.contrib import auth
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import models
-from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic import ListView, RedirectView
 from django.views.generic.base import TemplateView
 from el_pagination.views import AjaxListView
 
-from pulsifi.exceptions import GETParameterError
 from pulsifi.forms import Bio_Form, Login_Form, Signup_Form
 from pulsifi.models import Pulse, Reply, User
 from . import post_request_checkers
-from .mixins import PostRequestCheckerMixin, PulseListMixin, RedirectAuthenticatedUserMixin
+from .mixins import CanLoginMixin, PostRequestCheckerMixin, PulseListMixin, RedirectAuthenticatedUserMixin
 from .post_request_checkers import Template_View_Mixin_Protocol
 
 get_user_model = auth.get_user_model  # NOTE: Adding external package functions to the global scope for frequent usage
 
 
-class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast for account deletion, ask to log in when redirecting here (show modal), prevent users with >3 in progress reports or >0 completed reports from logging in (with reason page)
+class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast for account deletion, ask to log in when redirecting here (show modal)
     template_name = "pulsifi/home.html"
     http_method_names = ["get"]
 
@@ -83,18 +81,11 @@ class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast fo
         return context
 
 
-class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login
+class Feed_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login
     template_name = "pulsifi/feed.html"
 
-    def get(self, request: HttpRequest, *args, **kwargs) -> HttpResponse:
-        try:
-            return super().get(request, *args, **kwargs)
-        except GETParameterError:
-            return HttpResponseBadRequest()
-
-    def get_queryset(self) -> models.QuerySet[Pulse]:
+    def get_queryset(self) -> set[Pulse]:
         user: User = self.request.user
-        queryset: models.QuerySet[Pulse] = user.get_feed_pulses()
 
         if self.request.method == "GET" and "highlight" in self.request.GET:
             model_name: str
@@ -102,32 +93,37 @@ class Feed_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only
             # noinspection PyUnresolvedReferences
             model_name, _, object_id = self.request.GET["highlight"].partition("_")
             if model_name == "pulse" and object_id.isdecimal():
-                return queryset.exclude(id=object_id)
+                return user.get_feed_pulses(exclude={object_id})
 
-        return queryset
+        return user.get_feed_pulses()
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
         context = super().get_context_data(**kwargs)
 
-        context["attempted_highlight"] = False
-
         if self.request.method == "GET" and "highlight" in self.request.GET:
-            context["attempted_highlight"] = True
-
             model_name: str
             object_id: str
             # noinspection PyUnresolvedReferences
             model_name, _, object_id = self.request.GET["highlight"].partition("_")
             if model_name in {"pulse", "reply"} and object_id.isdecimal():
                 try:
-                    context["highlight"] = apps.get_model(app_label="pulsifi", model_name=model_name).objects.get(id=object_id)
+                    highlight: Pulse | Reply = apps.get_model(app_label="pulsifi", model_name=model_name).objects.get(id=object_id, is_visible=True)
+
+                    if highlight.hidden_by_reports:
+                        context["highlight"] = highlight
+                    else:
+                        context["failed_highlight"] = "The requested content could not be highlighted because too many completed reports have been made about the content's creator"
+
                 except (Pulse.DoesNotExist, Reply.DoesNotExist):
-                    pass
+                    context["failed_highlight"] = "The requested content could not be highlighted"
+
+            else:
+                context["failed_highlight"] = "The requested content could not be highlighted"
 
         return context
 
 
-class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast for users that have just signed up or just edited their bio/avatar
+class Self_Account_View(CanLoginMixin, RedirectView):  # TODO: Show toast for users that have just signed up or just edited their bio/avatar
     query_string = True
 
     def get_redirect_url(self, *args, **kwargs) -> str:
@@ -137,7 +133,7 @@ class Self_Account_View(LoginRequiredMixin, RedirectView):  # TODO: Show toast f
         )
 
 
-class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, change profile parts (if self profile), delete account with modal toast for account creation, prevent create new pulses/replies if (>3 in progress or >1 completed) reports on user or pulse/reply of user
+class Specific_Account_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible, change profile parts (if self profile), delete account with modal toast for account creation
     template_name = "pulsifi/account.html"
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
@@ -156,14 +152,19 @@ class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  
             username=self.kwargs.get("username")
         )
 
+        context["hidden"] = False
+
+        if context["specific_account"].hidden_by_reports:
+            context["hidden"] = "Too many completed reports made about this user"
+
         return context
 
-    def get_queryset(self) -> models.QuerySet[Pulse]:
-        return django_shortcuts.get_object_or_404(
+    def get_queryset(self) -> set[Pulse]:
+        return {pulse for pulse in django_shortcuts.get_object_or_404(
             get_user_model(),
             is_active=True,
             username=self.kwargs.get("username")
-        ).created_pulse_set.all()
+        ).created_pulse_set.filter(is_visible=True) if not pulse.hidden_by_reports}
 
     @classmethod
     def get_post_request_checker_functions(cls) -> set[Callable[[Template_View_Mixin_Protocol], bool | HttpResponse]]:
@@ -173,7 +174,7 @@ class Specific_Account_View(PulseListMixin, LoginRequiredMixin, AjaxListView):  
         }
 
 
-class Related_Users_View(LoginRequiredMixin, ListView, PostRequestCheckerMixin):
+class Related_Users_View(CanLoginMixin, ListView, PostRequestCheckerMixin):
     template_name = "pulsifi/related_users.html"
     context_object_name = "related_user_list"
 

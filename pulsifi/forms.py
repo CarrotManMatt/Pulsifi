@@ -159,9 +159,9 @@ class User_Generated_Content_Form(BaseFormConfig, forms.ModelForm):
         if not self.instance.creator:
             raise AttributeError(f"Attribute \"creator\" must be set on this {self.__class__.__name__}'s instance before cleaning.")
 
-        if Report.objects.filter().count() > settings.OPEN_REPORTS_LIMIT:
+        if self.instance.creator.hidden_by_open_reports:
             raise ValidationError(f"Cannot create new {self._meta.model.verbose_name}, because there are too many open reports created about you.", code="too_many_reports")
-        elif Report.objects.filter().count() > settings.COMPLETED_REPORTS_LIMIT:
+        elif self.instance.creator.hidden_by_completed_reports:
             raise ValidationError(f"Cannot create new {self._meta.model.verbose_name}, because there are too many open reports created about you.", code="too_many_reports")
 
         return self.cleaned_data
