@@ -1,6 +1,7 @@
 """
     Admin filters for models in pulsifi app.
 """
+
 import abc
 from typing import Container, Sequence
 
@@ -55,7 +56,7 @@ class UserVerifiedListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return ("1", "Is Verified"), ("0", "Is Not Verified")
+        return ("1", "Verified"), ("0", "Not Verified")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> models.QuerySet[User]:
         """ Returns the filtered queryset according to the given url lookup. """
@@ -122,7 +123,7 @@ class StaffListFilter(admin.SimpleListFilter):
             names of the possible lookups.
         """
 
-        return ("1", "Is Staff Member"), ("0", "Is Not Staff Member")
+        return ("1", "Staff Member"), ("0", "Not a Staff Member")
 
     def queryset(self, request: HttpRequest, queryset: models.QuerySet[User]) -> models.QuerySet[User]:
         """ Returns the filtered queryset according to the given url lookup. """

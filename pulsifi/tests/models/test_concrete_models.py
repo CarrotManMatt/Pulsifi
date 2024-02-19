@@ -443,7 +443,7 @@ class User_Model_Tests(Base_TestCase):
         user = Test_User_Factory.create()
         feed_pulses = user.get_feed_pulses()
 
-        self.assertIsInstance(feed_pulses, QuerySet)
+        self.assertIsInstance(feed_pulses, (QuerySet, set))
         for obj in feed_pulses:
             self.assertIsInstance(obj, Pulse)
 

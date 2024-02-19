@@ -9,11 +9,9 @@ from avatar.models import Avatar
 from django.contrib import admin
 from django.contrib.contenttypes.admin import GenericTabularInline
 from django.db import models
+from django.http import HttpRequest
 
 from pulsifi.models import Pulse, Reply, Report
-
-
-# TODO: add function argument type hints
 
 
 class _Base_Inline_Config:
@@ -47,7 +45,7 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
     )
 
     @admin.display(description="Number of likes", ordering="_likes")
-    def display_likes(self, obj: Pulse | Reply) -> int:
+    def display_likes(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of likes that this User_Generated_Content has,
             to be displayed within a User_Generated_Content inline on the admin
@@ -55,10 +53,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._likes
+        return str(obj._likes)
 
     @admin.display(description="Number of dislikes", ordering="_dislikes")
-    def display_dislikes(self, obj: Pulse | Reply) -> int:
+    def display_dislikes(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of dislikes that this User_Generated_Content
             has, to be displayed within a User_Generated_Content inline on the
@@ -66,10 +64,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._dislikes
+        return str(obj._dislikes)
 
     @admin.display(description="Number of direct replies")
-    def display_direct_replies_count(self, obj: Pulse | Reply) -> int:
+    def display_direct_replies_count(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of direct :model:`pulsifi.reply` objects that
             this User_Generated_Content has, to be displayed within a
@@ -77,10 +75,10 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
         """
 
         # noinspection PyUnresolvedReferences, PyProtectedMember
-        return obj._direct_replies
+        return str(obj._direct_replies)
 
     @admin.display(description="Number of full depth replies")
-    def display_full_depth_replies_count(self, obj: Pulse | Reply) -> int:
+    def display_full_depth_replies_count(self, obj: Pulse | Reply) -> str:
         """
             Returns the number of total :model:`pulsifi.reply` objects that are
             within the tree of this instance's children/children's children
@@ -88,7 +86,7 @@ class _Base_User_Content_Inline_Config(_Base_Inline_Config):
             admin page.
         """
 
-        return len(obj.full_depth_replies)
+        return str(len(obj.get_full_depth_replies()))
 
 
 class _Created_User_Content_Inline(_Base_User_Content_Inline_Config, admin.StackedInline):
@@ -100,7 +98,7 @@ class _Created_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Stack
     fk_name = "creator"
     autocomplete_fields = ("liked_by", "disliked_by")
 
-    def get_queryset(self, request) -> models.QuerySet[Pulse | Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Pulse | Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` or
             :model:`pulsifi.reply` model instances that can be created/edited
@@ -128,7 +126,7 @@ class _Related_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Tabul
         etc).
     """
 
-    def _get_queryset(self, request, model: str) -> models.QuerySet[Pulse | Reply]:
+    def _get_queryset(self, request: HttpRequest, model: str) -> models.QuerySet[Pulse | Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` or
             :model:`pulsifi.reply` model instances that can be created/edited
@@ -151,7 +149,7 @@ class _Related_User_Content_Inline(_Base_User_Content_Inline_Config, admin.Tabul
 
         return queryset
 
-    def has_add_permission(self, request, obj: Pulse.liked_by.through | Pulse.disliked_by.through | Reply.liked_by.through | Reply.disliked_by.through) -> bool:  # HACK: Prevent from creating new content objects from within this type of inline, as validation/signals is/are not performed/sent correctly
+    def has_add_permission(self, request: HttpRequest, obj: Pulse.liked_by.through | Pulse.disliked_by.through | Reply.liked_by.through | Reply.disliked_by.through) -> bool:  # HACK: Prevent from creating new content objects from within this type of inline, as validation/signals is/are not performed/sent correctly
         """
             Prevent creation of new content objects from within this type of
             inline, because validation/signals is/are not performed/sent
@@ -177,7 +175,7 @@ class _Related_Pulse_Inline(_Related_User_Content_Inline):
 
         return obj.pulse.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_queryset(self, request) -> models.QuerySet[Pulse]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Pulse]:
         """
             Return a QuerySet of all :model:`pulsifi.pulse` model instances
             that can be created/edited within this admin inline.
@@ -189,7 +187,7 @@ class _Related_Pulse_Inline(_Related_User_Content_Inline):
 
         return super()._get_queryset(request, "pulse")
 
-    def get_fields(self, request, obj: Pulse.liked_by.through | Pulse.disliked_by.through = None) -> Sequence[str]:
+    def get_fields(self, request: HttpRequest, obj: Pulse.liked_by.through | Pulse.disliked_by.through = None) -> Sequence[str]:
         """
             Removes the necessary fields from the parent class's set of
             fields, only if they exist where they shouldn't.
@@ -226,7 +224,7 @@ class _Related_Reply_Inline(_Related_User_Content_Inline):
         return obj.reply.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
     @admin.display(description="Original Pulse")
-    def display_original_pulse(self, obj: Reply.liked_by.through | Reply.disliked_by.through) -> Pulse:
+    def display_original_pulse(self, obj: Reply.liked_by.through | Reply.disliked_by.through) -> str:
         """
             Returns the single :model:`pulsifi.pulse` object instance that is
             the highest parent object in the tree of :model:`pulsifi.pulse` &
@@ -235,9 +233,9 @@ class _Related_Reply_Inline(_Related_User_Content_Inline):
             the admin page.
         """
 
-        return obj.reply.original_pulse
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"
 
-    def get_queryset(self, request) -> models.QuerySet[Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.reply` model instances
             that can be created/edited within this admin inline.
@@ -270,7 +268,7 @@ class _Base_Reply_Inline_Config(_Base_Inline_Config):
     model = Reply
 
     @admin.display(description="Original Pulse")
-    def display_original_pulse(self, obj: Reply) -> Pulse:
+    def display_original_pulse(self, obj: Reply) -> str:
         """
             Returns the single :model:`pulsifi.pulse` object instance that is
             the highest parent object in the tree of :model:`pulsifi.pulse` &
@@ -279,7 +277,7 @@ class _Base_Reply_Inline_Config(_Base_Inline_Config):
             admin page.
         """
 
-        return obj.original_pulse
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"
 
 
 class _Base_Report_Inline_Config(_Base_Inline_Config):
@@ -324,7 +322,7 @@ class Created_Pulse_Inline(_Base_Pulse_Inline_Config, _Created_User_Content_Inli
     verbose_name = "Created Pulse"
     fieldsets = [
         (None, {
-            "fields": ["message", ("visible", "display_date_time_created")]
+            "fields": ["message", ("is_visible", "display_date_time_created")]
         }),
         ("Likes & Dislikes", {
             "fields": [("liked_by", "display_likes"), ("disliked_by", "display_dislikes")]
@@ -344,7 +342,7 @@ class Created_Pulse_Inline(_Base_Pulse_Inline_Config, _Created_User_Content_Inli
 
         return obj.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_readonly_fields(self, request, obj=None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Pulse = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -389,7 +387,7 @@ class Created_Reply_Inline(_Base_Reply_Inline_Config, _Created_User_Content_Inli
     verbose_name_plural = "Created Replies"
     fieldsets = [
         (None, {
-            "fields": ["message", ("visible", "display_date_time_created")]
+            "fields": ["message", ("is_visible", "display_date_time_created")]
         }),
         ("Replied Content", {
             "fields": [("_content_type", "_object_id"), "display_original_pulse"]
@@ -413,7 +411,7 @@ class Created_Reply_Inline(_Base_Reply_Inline_Config, _Created_User_Content_Inli
 
         return obj.date_time_created.strftime("%d %b %Y %I:%M:%S %p")
 
-    def get_readonly_fields(self, request, obj=None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.
@@ -511,11 +509,11 @@ class Direct_Reply_Inline(_Base_Reply_Inline_Config, _Base_User_Content_Inline_C
         "display_direct_replies_count",
         "display_full_depth_replies_count",
         "display_original_pulse",
-        "visible"
+        "is_visible"
     ]
     autocomplete_fields = ["liked_by", "disliked_by"]
 
-    def get_queryset(self, request) -> models.QuerySet[Reply]:
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[Reply]:
         """
             Return a QuerySet of all :model:`pulsifi.reply` model instances
             that can be created/edited within this admin inline.
@@ -534,7 +532,7 @@ class Direct_Reply_Inline(_Base_Reply_Inline_Config, _Base_User_Content_Inline_C
 
         return queryset
 
-    def get_readonly_fields(self, request, obj: Reply = None) -> Sequence[str]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Reply = None) -> Sequence[str]:
         """
             Adds the necessary readonly fields to the parent class's set of
             readonly_fields, only if they don't already exist.

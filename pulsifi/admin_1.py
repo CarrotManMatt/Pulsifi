@@ -361,7 +361,7 @@ class Reply_Admin(_User_Content_Admin):
             admin pages.
         """
 
-        return f"{obj.original_pulse.id} | {obj.original_pulse}"
+        return f"{obj.original_pulse.id} | {obj.original_pulse}"[:100]
 
     @admin.display(description="Replied Content")
     def display_replied_content(self, obj: Reply) -> str:
@@ -370,7 +370,7 @@ class Reply_Admin(_User_Content_Admin):
             this :model:`pulsifi.reply` object is a Reply to.
         """
 
-        return f"{obj.replied_content.id} | {obj.replied_content}"
+        return f"{obj.replied_content.id} | {obj.replied_content}"[:100]
 
     def get_fieldsets(self, request: HttpRequest, obj: Reply = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """
@@ -528,7 +528,7 @@ class Report_Admin(_Display_Date_Time_Created_Admin):
             instance, to be displayed on the admin pages.
         """
 
-        return f"{obj.reported_object.id} | {obj.reported_object}"
+        return f"{obj.reported_object.id} | {obj.reported_object}"[:100]
 
     def get_fieldsets(self, request: HttpRequest, obj: Report = None) -> Sequence[tuple[str | None, dict[str, Sequence[str | tuple[str, ...]]]]]:
         """

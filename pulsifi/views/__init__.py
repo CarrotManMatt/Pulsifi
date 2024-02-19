@@ -81,7 +81,7 @@ class Home_View(RedirectAuthenticatedUserMixin, TemplateView):  # TODO: toast fo
         return context
 
 
-class Feed_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible & creator is active+visible & not in any non-rejected reports, toast for successful redirect after login
+class Feed_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time, toast for successful redirect after login
     template_name = "pulsifi/feed.html"
 
     def get_queryset(self) -> set[Pulse]:
@@ -133,7 +133,7 @@ class Self_Account_View(CanLoginMixin, RedirectView):  # TODO: Show toast for us
         )
 
 
-class Specific_Account_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time & visible, change profile parts (if self profile), delete account with modal toast for account creation
+class Specific_Account_View(PulseListMixin, CanLoginMixin, AjaxListView):  # TODO: only show pulses/replies if within time, change profile parts (if self profile), delete account with modal toast for account creation
     template_name = "pulsifi/account.html"
 
     def get_context_data(self, **kwargs) -> dict[str, ...]:
