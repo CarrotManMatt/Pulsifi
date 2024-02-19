@@ -1,0 +1,81 @@
+{% load avatar_tags %}
+{% load pulsifi_extras %}
+{% load static %}
+
+{% model_meta content as content_meta %}
+{% model_content_type content as content_content_type %}
+
+<div class="container-fluid px-5 pt-3 text-center">
+    <div class="card flex-x5-nowrap">
+        <div class="tab-content admin-tab-content pt30">
+            <div role="tabpanel" class="tab-pane active show">
+                <ul class="activity-list list-unstyled">
+                    <li class="clearfix">
+                        <div class="float-left">
+                            <div class="flex-shrink-0">
+                                <a href="{{ content.creator.get_absolute_url }}">
+                                    {% avatar content.creator 100 class="img-fluid m-2" style="border-radius: 100px;" %}
+                                </a>
+                            </div>
+                        </div>
+                        <div class="act-content mb-3">
+                            <div class="font400">
+                                <a href="{{ content.creator.get_absolute_url }}" class="font600 align-middle">{{ content.creator }}{% if content.creator.is_verified %}<img class="mx-1 pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}{% if content.creator.is_staff %}<img class="pb-1 align-middle" width="15" src="{% static "pulsifi/brand/Staff.png" %}" alt="staff member icon">{% endif %}</a> {% if content_meta.model_name == "pulse" %}posted{% elif content_meta.model_name == "reply" %}replied{% endif %}
+                            </div>
+                            {% if content_meta.model_name == "pulse" %}
+                                <span class="text-small">{{ content.date_time_created|timesince }} Ago</span>
+                                <div>{{ content_meta.verbose_name }} will be deleted in <p id="time">??:??</p></div>
+                            {% endif %}
+                            <p class="fs-5">{{ content.message|format_mentions }}</p>
+                            <span class="text-small">{{ content.liked_by.count }} Likes</span>
+                            {% if request.user != content.creator %}
+                                <form style="display:inline;" method="post">  {# like action in backgroud with ajax to prevent page refresh #}
+                                    {% csrf_token %}
+                                    {% if request.user in content.liked_by.all %}
+                                        <input type="submit" class="btn btn-sm btn-success" value="✕ Remove Like ✕">
+                                        <input type="hidden" name="action" value="remove_like">
+                                    {% else %}
+                                        <input type="submit" class="btn btn-sm btn-success" value="Like">
+                                        <input type="hidden" name="action" value="like">
+                                    {% endif %}
+                                    <input type="hidden" name="likeable_object_id" value="{{ content.id }}">
+                                    <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
+                                </form>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-secondary"
+                                    onclick="addModalData('create-reply-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-reply-modal')">Reply to this
+                                {{ content_meta.verbose_name }}
+                            </button>
+                            {% if not content.creator|user_is_admin and request.user != content.creator %}
+                                <button type="button" class="btn btn-sm btn-info"
+                                        onclick="addModalData('create-report-modal', '{{ content_content_type.id }}', '{{ content.id }}');openModal('create-report-modal')">Report this
+                                    {{ content_meta.verbose_name }}
+                                </button>
+                            {% endif %}
+                            {% if request.user != content.creator %}
+                                <form style="display:inline;" method="post">  {# dislike action in backgroud with ajax to prevent page refresh #}
+                                    {% csrf_token %}
+                                    {% if request.user in content.disliked_by.all %}
+                                        <input type="submit" class="btn btn-sm btn-danger" value="✕ Remove Dislike ✕">
+                                        <input type="hidden" name="action" value="remove_dislike">
+                                    {% else %}
+                                        <input type="submit" class="btn btn-sm btn-danger" value="Dislike">
+                                        <input type="hidden" name="action" value="dislike">
+                                    {% endif %}
+                                    <input type="hidden" name="dislikeable_object_id" value="{{ content.id }}">
+                                    <input type="hidden" name="actionable_model_name" value="{{ content_meta.model_name }}">
+                                </form>
+                            {% endif %}
+                            <span class="text-small">{{ content.disliked_by.count }} Dislikes</span>
+                            {% for reply in content.get_visible_replies %}
+                                {% with content=reply %}
+                                    {% include "pulsifi/content_iterate_snippet.html" %}
+                                {% endwith %}
+                            {% endfor %}
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,40 @@
+{% extends "pulsifi/modals/user_flow_base.html" %}
+{% load socialaccount %}
+
+{% block modal_id %}sign-up-modal{% endblock %}
+{% block modal_title %}Sign Up{% endblock %}
+{% block modal_close_id %}close-sign-up-modal{% endblock %}
+{% block close_modal_function_id %}sign-up-modal{% endblock %}
+
+
+{% block modal_body %}
+    <form id="signup_form" method="post" action="{% url 'pulsifi:signup_POST' %}">
+        {% if signup_form.errors %}
+            <div id="form-error">
+                <p>The operation could not be performed because one or more error(s) occurred.<br/>Please resubmit the form after making the following changes:</p>
+                <ul>
+                    {% for field, errors in signup_form.errors.items %}
+                        {% if field == "__all__" or field == "password2" %}
+                            {% for error in errors %}
+                                <li>{{ error|striptags }}</li>
+                            {% endfor %}
+                        {% else %}
+                            <li>{% if field == "password1" %}Password{% else %}{{ field|striptags|title }}{% endif %}:
+                                <ul>{% for error in errors %}
+                                    <li>{{ error|striptags }}</li>{% endfor %}</ul>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        {% csrf_token %}
+        {{ signup_form }}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
+        <div class="modal-footer">
+            <button type="submit" class="btn text-white" id="sign-up-submit" style="background-color: #ba03fc;">Sign Up</button>
+        </div>
+    </form>
+{% endblock %}

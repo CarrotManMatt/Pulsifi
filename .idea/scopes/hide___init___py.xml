@@ -1,0 +1,3 @@
+<component name="DependencyValidationManager">
+  <scope name="hide __init__.py" pattern="!file[Pulsifi]:*/__init__.py||file:pulsifi/admin/__init__.py||file:pulsifi/views/__init__.py||file:pulsifi/models/__init__.py||file:pulsifi/urls/__init__.py||file:pulsifi/forms/__init__.py||file:pulsifi/signals/__init__.py||file:pulsifi/exceptions/__init__.py||file:pulsifi/validators/__init__.py" />
+</component>

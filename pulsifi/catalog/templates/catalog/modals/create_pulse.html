@@ -1,0 +1,23 @@
+{% extends "pulsifi/modals/create_base.html" %}
+
+{% block modal_id %}create-pulse-modal{% endblock %}
+{% block modal_title %}New Pulse{% endblock %}
+{% block modal_close_id %}close-create-pulse-modal{% endblock %}
+{% block close_modal_function_id %}create-pulse-modal{% endblock %}
+
+{% block modal_body %}
+    <input type="hidden" name="action" id="action" value="create_pulse">
+    {{ create_pulse_form }}
+{% endblock %}
+
+{% block submit_button_id %}create-pulse-submit{% endblock %}
+{% block submit_button_content %}Post to Pulsifi{% endblock %}
+
+{% block scripts %}
+    <script>
+        let create_pulse_modal_button = document.getElementById("create-pulse-modal-button");
+        create_pulse_modal_button.addEventListener("click", () => {
+            openModal("create-pulse-modal")
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,23 @@
+<div class="modal fade" id="{% block modal_id %}{% endblock %}" tabindex="-1">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{% block modal_title %}{% endblock %}</h5>
+                <button type="button" class="close" id="{% block modal_close_id %}{% endblock %}" aria-label="Close" onclick="closeModal('{% block close_modal_function_id %}{% endblock %}');">
+                    <span aria-hidden="true">x</span>
+                </button>
+            </div>
+            <form method="post">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {% block modal_body %}{% endblock %}
+                </div>
+                <div class="modal-footer">
+                    <input type="submit" class="btn text-white" id="{% block submit_button_id %}{% endblock %}" style="background-color: #ba03fc;" value="{% block submit_button_content %}{% endblock %}">
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}{% endblock %}

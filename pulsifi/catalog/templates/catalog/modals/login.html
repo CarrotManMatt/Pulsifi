@@ -1,0 +1,58 @@
+{% extends "pulsifi/modals/user_flow_base.html" %}
+{% load socialaccount %}
+
+{% block modal_id %}sign-in-modal{% endblock %}
+{% block modal_title %}Log In{% endblock %}
+{% block modal_close_id %}close-sign-in-modal{% endblock %}
+{% block close_modal_function_id %}sign-in-modal{% endblock %}
+
+
+{% block modal_body %}
+    {% get_providers as socialaccount_providers %}
+    {% if socialaccount_providers %}
+        {% for socialaccount_provider in socialaccount_providers %}
+            <!--suppress SpellCheckingInspection -->
+            <form action="{% provider_login_url socialaccount_provider.id %}" method="post">
+                {% csrf_token %}
+                <button class="btn text-white mb-1" type="submit" style="background-color: #ba03fc;">Log in with {% if socialaccount_provider.id == "microsoft" %}
+                    Microsoft{% else %}
+                    {{ socialaccount_provider.name }}{% endif %}</button>
+            </form>
+        {% endfor %}
+    {% endif %}
+
+    <h5 class="mt-3">Or log in with a local account</h5>
+
+    <form id="login_form" method="post" action="{% url 'pulsifi:login_POST' %}">
+        {% if login_form.errors %}
+            <div id="form-error">
+                <p>The operation could not be performed because one or more error(s) occurred.<br/>Please resubmit the form after making the following changes:</p>
+                <ul>
+                    {% for field, errors in login_form.errors.items %}
+                        {% if field == "__all__" %}
+                            {% for error in errors %}
+                                <li>{{ error|striptags }}</li>
+                            {% endfor %}
+                        {% else %}
+                            <li>{{ field|striptags|title }}:
+                                <ul>{% for error in errors %}
+                                    <li>{{ error|striptags }}</li>{% endfor %}</ul>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+        {% csrf_token %}
+        {{ login_form }}
+        {% if redirect_field_value %}
+            <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}">
+        {% endif %}
+        <div class="modal-footer">
+            <a style="margin-right: 2rem;" href="{% url 'pulsifi:home' %}?action=signup{% if "next" in request.GET %}&next={{ request.GET.next|urlencode }}{% endif %}">Create a
+                local
+                account</a>
+            <button type="submit" class="btn text-white" id="sign-in-submit" style="background-color: #ba03fc;">Sign In</button>
+        </div>
+    </form>
+{% endblock %}

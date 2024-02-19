@@ -1,0 +1,15 @@
+{% extends "pulsifi/modals/create_base.html" %}
+
+{% block modal_id %}create-report-modal{% endblock %}
+{% block modal_close_id %}close-create-report-modal{% endblock %}
+{% block close_modal_function_id %}create-report-modal{% endblock %}
+
+{% block modal_title %}New Report{% endblock %}
+
+{% block modal_body %}
+    <input type="hidden" name="action" id="action" value="create_report">
+    {{ create_report_form }}
+{% endblock %}
+
+{% block submit_button_id %}create-report-submit{% endblock %}
+{% block submit_button_content %}Submit Report{% endblock %}

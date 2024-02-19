@@ -1,0 +1,34 @@
+{% load static %}
+
+<nav class="navbar rounded-bottom navbar-light navbar-expand-lg pl-5 pr-5" style="background-color: #ba03fc;">
+    <a class="navbar-brand align-middle" href="{% url "default" %}">
+        <img height=30px alt="Main Pulsifi Logo" src="{% static "pulsifi/brand/Logo-White_Transparent.png" %}">
+    </a>
+    <div class="navbar-collapse {% if not request.user.is_authenticated %}justify-content-end{% endif %}">
+        <div class="navbar-nav">
+            {% if request.user.is_authenticated %}
+                <a class="nav-link px-3 text text-white" href="{% url "pulsifi:feed" %}">Feed</a>
+                <a class="nav-link px-3 text-white" href="{% url "pulsifi:self_account" %}">Profile</a>
+                {% if request.user.is_staff %}<a class="nav-link px-3 text-white" href="{% url "admin:index" %}">Admin</a>{% endif %}
+            {% else %}
+                <a class="nav-link">
+                    <button type="button" class="btn btn-light" id="sign-up">Sign Up</button>
+                </a>
+                <a class="nav-link">
+                    <button type="button" class="btn btn-light" id="sign-in">Sign In</button>
+                </a>
+            {% endif %}
+        </div>
+    </div>
+    {% if request.user.is_authenticated %}
+        <div class="right">
+            <form method="post" action="{% url "account_logout" %}">
+                {% csrf_token %}
+                {% if redirect_field_value %}
+                    <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}"/>
+                {% endif %}
+                <button type="submit" class="btn w3-purple" style="float: right;">Sign Out</button>
+            </form>
+        </div>
+    {% endif %}
+</nav>

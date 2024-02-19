@@ -1,0 +1,221 @@
+{% extends "pulsifi/base.html" %}
+{% load avatar_tags %}
+{% load socialaccount %}
+{% load pulsifi_extras %}
+{% load static %}
+
+{% block title %}{{ specific_account }}{% endblock %}
+
+{% block content %}
+    <div class="container py-5">
+        <div class="card h-100">
+            <div class="card">
+                <div class="card-body p-2 justify-content-start">
+                    <div class="d-flex text-black">
+                        <div class="flex-shrink-0">
+                            {% if request.user == specific_account %}
+                                <form enctype="multipart/form-data" method="POST" action="{% url "avatar_add" %}">
+                                    {% csrf_token %}
+
+                                    {% avatar specific_account 100 class="img-fluid mr-2 mb-2" style="border-radius: 100px;" %}
+
+                                    <input type="file" name="avatar" accept="image/*" required id="id_avatar">
+                                    <input class="d-block ml-3" type="submit" value="add pfp"/>
+                                </form>
+
+                            {% else %}
+                                {% avatar specific_account class="img-fluid" style="border-radius: 100px;" %}
+                            {% endif %}
+                        </div>
+
+                        <div class="flex-grow-1 justify-content-end rounded-3">
+                            <h5 class="mb-1 d-inline align-middle">{{ specific_account }}</h5>{% if specific_account.is_verified %}<img class="ms-1 pt-1 align-middle" width="17" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}{% if specific_account.is_staff %}<img class="ms-1 pt-1 align-middle" width="17" src="{% static "pulsifi/brand/Staff.png" %}" alt="staff member icon">{% endif %}
+
+                            <div class="p-4" style="background-color: #ffff;">
+                                {% if specific_account == request.user %}
+                                    <form method="post">
+                                        {% csrf_token %}
+
+                                        {{ update_bio_form }}
+
+                                        <input type="hidden" name="action" value="update_bio">
+                                        <input type="submit" value="Update bio">
+                                    </form>
+
+                                {% elif not hidden %}
+                                    <p class="small text-muted mb-1">{{ specific_account.bio|format_mentions }}</p>
+                                {% endif %}
+                            </div>
+
+                            {% if not hidden %}
+                                <div class="d-flex justify-content-start rounded-3 p-2 mb-2"
+                                     style="background-color: #ffff;">
+                                    <div class="px-3">
+                                        {% if specific_account == request.user %}
+                                            <a href="{% url 'pulsifi:followers' %}">
+                                        {% endif %}
+
+                                        <p class="small text-muted mb-1">Followers</p>
+                                        <p class="mb-0">{{ specific_account.followers.count }}</p>
+
+                                        {% if specific_account == request.user %}
+                                            </a>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="px-3">
+                                        {% if specific_account == request.user %}
+                                            <a href="{% url 'pulsifi:following' %}">
+                                        {% endif %}
+
+                                        <p class="small text-muted mb-1">Following</p>
+                                        <p class="mb-0">{{ specific_account.following.count }}</p>
+
+                                        {% if specific_account == request.user %}
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                            {% if specific_account != request.user %}
+                                <div class="d-flex pt-1">
+                                    <form method="post">
+                                        {% csrf_token %}
+
+                                        {% if request.user not in specific_account.followers.all %}
+                                            <input type="hidden" name="action" value="follow">
+                                            <input type="hidden" name="follow_user_id" value="{{ specific_account.id }}">
+                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple border-0" value="Follow">
+
+                                        {% else %}
+                                            <input type="hidden" name="action" value="unfollow">
+                                            <input type="hidden" name="unfollow_user_id" value="{{ specific_account.id }}">
+                                            <input type="submit" class="btn btn-primary flex-grow-1 w3-purple border-0" value="Unfollow">
+                                        {% endif %}
+                                    </form>
+                                    {% if not specific_account|user_is_admin %}
+                                        {% model_content_type specific_account as specific_account_content_type %}
+                                        <button type="button" class="btn btn-sm btn-info"
+                                                onclick="addModalData('create-report-modal', {{ specific_account_content_type.id }}, '{{ specific_account.id }}');openModal('create-report-modal')">Report User
+                                        </button>
+                                    {% endif %}
+                                </div>
+
+                            {% else %}
+                                <p>Send an email to <a class="text-primary" href="mailto:support@pulsifi.tech">support@pulsifi.tech</a> to request verification or delete your account.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if request.user == specific_account %}
+                        <div>
+                            <a href="{% url "avatar_delete" %}" class=" btn btn-info">Delete avatars</a>
+
+                            <form method="post" action="{% provider_login_url "discord" %}">
+                                {% csrf_token %}
+                                <input type="submit" value="Connect a Discord account">
+                            </form>
+
+                            <form method="post" action="{% provider_login_url "github" %}">
+                                {% csrf_token %}
+                                <input type="submit" value="Connect a GitHub account">
+                            </form>
+
+                            <form method="post" action="{% provider_login_url "google" %}">
+                                {% csrf_token %}
+                                <input type="submit" value="Connect a Google account">
+                            </form>
+
+                            <form method="post" action="{% provider_login_url "microsoft" %}">
+                                {% csrf_token %}
+                                <input type="submit" value="Connect a Microsoft account">
+                            </form>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="mx-auto">
+            <div class="row">
+                {% if not hidden %}
+                    <div class="col-sm">
+                        <h1 class="align-middle" style="color:#ba03fc">{% if specific_account == request.user %}Your{% else %}{{ specific_account }}'s{% if specific_account.is_verified %}<img class="mx-1 pb-1" width="28" src="{% static "pulsifi/brand/Verified.png" %}" alt="verified icon">{% endif %}{% if specific_account.is_staff %}<img class="pb-1" width="28" src="{% static "pulsifi/brand/Staff.png" %}" alt="staff member icon">{% endif %}{% endif %} Pulses</h1>
+                    </div>
+                {% endif %}
+
+                <div class="col-sm-2 pt-3">
+                    <button type="button" class="btn w3-purple" style="float: right;" id="create-pulse-modal-button">New Pulse</button>
+                </div>
+            </div>
+
+            {% if hidden %}
+                This user is hidden. Reason: {{ hidden }}
+
+            {% elif not pulse_list %}
+                No Pulses
+
+            {% else %}
+                {% for pulse in pulse_list %}
+                    {% with content=pulse %}
+                        {% include content_iterate_snippet %}
+                    {% endwith %}
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block modals %}
+    {% include "pulsifi/modals/create_pulse.html" %}
+
+    {% include "pulsifi/modals/create_reply.html" %}
+
+    {% include "pulsifi/modals/create_report.html" %}
+
+    <div class="modal-backdrop fade show" id="backdrop" style="display: none;"></div>
+    <script>
+        function startTimer(duration, display) {
+            let start = Date.now(),
+                diff,
+                minutes,
+                seconds;
+
+            function timer() {
+                // get the number of seconds that have elapsed since
+                // startTimer() was called
+                diff = duration - (((Date.now() - start) / 1000) | 0);
+
+                // does the same job as parseInt truncates the float
+                minutes = (diff / 60) | 0;
+                seconds = (diff % 60) | 0;
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+
+                if (diff <= 0) {
+                    // add one second so that the count-down starts at the full duration
+                    // example 05:00 not 04:59
+                    start = Date.now() + 1000;
+                }
+            }
+
+            // we don't want to wait a full second before the timer starts
+            timer();
+            setInterval(timer, 1000);
+        }
+
+        window.onload = function () {
+            let threeMinutes = 50 * 10,
+                display = document.querySelector('#time');
+            startTimer(threeMinutes, display);
+        };
+    </script>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static "pulsifi/js_snippets/modal_controller.js" %}"></script>
+{% endblock %}
